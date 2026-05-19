@@ -1,6 +1,6 @@
 # Civilization 6 BBG Chatbot
 
-A RAG-based chatbot that answers questions about the Better Game Balance (BBG) mod for Civilization VI. Ask it about unit stats, leader abilities, balance changes across versions, wonders, policies, and more — with full awareness of which BBG version introduced or changed something.
+A RAG-based chatbot that answers questions about the Better Game Balance (BBG) mod for Civilization VI. Ask it about unit stats, leader abilities, balance changes across versions, wonders, policies, and more : with full awareness of which BBG version introduced or changed something. For extra fun, ask for opinions.
 
 🟢 **Live app:** [civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app](https://civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app/) *(password required)*
 
@@ -8,11 +8,11 @@ A RAG-based chatbot that answers questions about the Better Game Balance (BBG) m
 
 ## How it works
 
-1. **Scraping** — BeautifulSoup scrapers pull data from the BBG patch notes pages across 4 versions (`v7.1` through `v7.4`, plus `base_game`), covering units, leaders, buildings, wonders, policies, great people, changelogs, and more.
-2. **Ingestion** — Scraped entries are embedded with OpenAI's `text-embedding-3-small` model and upserted into a Pinecone cloud vector database.
-3. **Retrieval** — At query time, a version extractor (Claude) parses the user's question to determine which BBG version they're asking about and which section of data is most relevant. The retriever then performs a filtered similarity search.
-4. **Generation** — Retrieved documents are passed to Claude along with the original question to generate a response.
-5. **UI** — A Streamlit app serves the chatbot with session-based conversation history.
+1. **Scraping** : BeautifulSoup scrapers pull data from the BBG patch notes pages across 4 versions (`v7.1` through `v7.4`, plus `base_game`), covering units, leaders, buildings, wonders, policies, great people, changelogs, and more.
+2. **Ingestion** : Scraped entries are embedded with OpenAI's `text-embedding-3-small` model and upserted into a Pinecone cloud vector database.
+3. **Retrieval** : At query time, a version extractor (Claude) parses the user's question to determine which BBG version they're asking about and which section of data is most relevant. The retriever then performs a filtered similarity search.
+4. **Generation** : Retrieved documents are passed to Claude along with the original question to generate a response.
+5. **UI** : A Streamlit app serves the chatbot with session-based conversation history.
 
 ---
 
