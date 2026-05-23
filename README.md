@@ -4,6 +4,8 @@ A RAG-based chatbot that answers questions about the Better Game Balance (BBG) m
 
 🟢 **Live app:** [civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app](https://civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app/) *(password required)*
 
+Live demo requires password due to API costs — screenshots at the bottom.
+
 ---
 
 ## How it works
@@ -84,3 +86,14 @@ pytest
 ## Limitations
 
 - **Base game reference data** (promotion trees, vanilla unit stats) is not included — the chatbot covers BBG balance changes only. For base game lookups, refer to the [Civilization Wiki](https://civilization.fandom.com/wiki/Civilization_VI).
+
+---
+
+## Screenshots ##
+
+<img width="1085" height="868" alt="Screenshot_2026-05-23_15-37-06" src="https://github.com/user-attachments/assets/d40e23b9-1152-4552-a3f3-6884cdfa25bf" />
+<img width="1085" height="868" alt="Screenshot_2026-05-23_15-38-05" src="https://github.com/user-attachments/assets/1e0ae9ae-d229-46f5-afbb-e2f9fe214490" />
+<img width="1085" height="868" alt="Screenshot_2026-05-23_15-39-37" src="https://github.com/user-attachments/assets/77dca6db-9405-4bc0-962a-8b8a7d56fa40" />
+<img width="1085" height="868" alt="Screenshot_2026-05-23_15-40-46" src="https://github.com/user-attachments/assets/8bb8a639-531c-45cf-841d-080c7bf1fe0a" />
+
+---
