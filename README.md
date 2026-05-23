@@ -1,4 +1,4 @@
-# Civilization 6 BBG Chatbot
+# RAG Pipeline — Civilization 6 Domain
 
 A RAG-based chatbot that answers questions about the Better Game Balance (BBG) mod for Civilization VI. Ask it about unit stats, leader abilities, balance changes across versions, wonders, policies, and more : with full awareness of which BBG version introduced or changed something. For extra fun, ask for opinions.
 
