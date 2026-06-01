@@ -10,6 +10,7 @@ dependencies = [
     "langchain-anthropic>=1.4.1",
     "langchain-openai>=1.1.14",
     "langchain-pinecone>=0.2.13",
+    "langgraph>=1.2.3",
     "pinecone>=7.3.0",
     "python-dotenv>=1.2.2",
     "requests>=2.33.1",

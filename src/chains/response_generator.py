@@ -6,8 +6,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from src.chains.rag_pipeline import _rag_pipeline
+from src.chains import version_extractor as ve
 from src.config import ANTHROPIC_MODEL
+from src.retrieval.retriever import graph
 from src.secrets import get_secret
 
 os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
@@ -31,15 +32,27 @@ def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
         else:
             converted_history.append(AIMessage(content=msg["content"]))
 
-    llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
-    docs = _rag_pipeline(query, converted_history)
+    recent_history = history[-4:]
+    parsed_query, routing_decision = ve.run_extraction_pipeline(query, recent_history)
 
-    if not docs:
+    docs = graph.invoke(
+        {
+            "query": parsed_query.cleaned_query,
+            "version": parsed_query.version,
+            "section_hints": routing_decision.section_hints,
+            "current_section": None,
+            "documents": [],
+        }
+    )
+
+    print(f"docs = {docs}")
+
+    if not docs["documents"]:
         response = "Sorry I need more information."
 
     else:
         information = ""
-        for doc in docs:
+        for doc in docs["documents"]:
             information += f"<information_block>\n{doc.page_content}\n\n"
             meta_block = ", ".join(
                 [f"{key}: {value}" for key, value in doc.metadata.items()]
@@ -65,7 +78,8 @@ def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
             ]
         )
 
+        llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
         chain = cpt | llm | StrOutputParser()
         response = chain.invoke({"query": query, "history": history})
 
-    return (response, docs)
+    return (response, docs["documents"])

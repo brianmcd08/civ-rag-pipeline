@@ -15,6 +15,10 @@ client = anthropic.Anthropic()
 # groundedness flags version provenance claims as unsupported when the relevant version
 # chunk wasn't retrieved. Root cause is retrieval, not generation.
 # Investigate whether version-scoped retrieval improvements in the supervisor fix this.
+# the Guru heal charges (2 vs 3) has now shown up in groundedness twice. That's a real
+# data error in the knowledge base, not a generation problem. Worth fixing at ingestion.
+# the version history hallucinations are consistent. Same pattern every run.
+# That's v3 persona investigation.
 
 grounding_prompt = """
     You are an impartial evaluator. Your job is to assess if the provided response could be generated from the provided documents and give your reasoning.
@@ -37,7 +41,7 @@ grounding_prompt = """
 
 
 async def grounding_judge(chunks: list[Document], response: str) -> PartialJudgment:
-    result = client.messages.parse(
+    result = client.beta.messages.parse(
         model=ANTHROPIC_JUDGE,
         max_tokens=1024,
         system=grounding_prompt,

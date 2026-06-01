@@ -36,7 +36,7 @@ answer_relevance_prompt = """
 
 
 async def answer_relevance_judge(query: str, response: str) -> PartialJudgment:
-    result = client.messages.parse(
+    result = client.beta.messages.parse(
         model=ANTHROPIC_JUDGE,
         max_tokens=1024,
         system=answer_relevance_prompt,

@@ -31,7 +31,7 @@ context_relevance_prompt = """
 async def context_relevance_judge(
     chunks: list[Document], query: str
 ) -> PartialJudgment:
-    result = client.messages.parse(
+    result = client.beta.messages.parse(
         model=ANTHROPIC_JUDGE,
         max_tokens=1024,
         system=context_relevance_prompt,
