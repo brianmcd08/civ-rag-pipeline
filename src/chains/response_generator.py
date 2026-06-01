@@ -1,18 +1,19 @@
 import os
 
 from langchain_anthropic import ChatAnthropic
+from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from src.chains.rag_pipeline import rag_pipeline
+from src.chains.rag_pipeline import _rag_pipeline
 from src.config import ANTHROPIC_MODEL
 from src.secrets import get_secret
 
 os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
 
 
-def generate_response(query: str, history: list) -> str:
+def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
     """
     The entire pipeline
 
@@ -31,14 +32,14 @@ def generate_response(query: str, history: list) -> str:
             converted_history.append(AIMessage(content=msg["content"]))
 
     llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
-    result = rag_pipeline(query, converted_history)
+    docs = _rag_pipeline(query, converted_history)
 
-    if not result:
+    if not docs:
         response = "Sorry I need more information."
 
     else:
         information = ""
-        for doc in result:
+        for doc in docs:
             information += f"<information_block>\n{doc.page_content}\n\n"
             meta_block = ", ".join(
                 [f"{key}: {value}" for key, value in doc.metadata.items()]
@@ -67,4 +68,4 @@ def generate_response(query: str, history: list) -> str:
         chain = cpt | llm | StrOutputParser()
         response = chain.invoke({"query": query, "history": history})
 
-    return response
+    return (response, docs)

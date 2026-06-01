@@ -5,7 +5,7 @@ def test_generate_response():
     expected_answer = "7.4"
 
     query = "Whaz thel atest verzion that haz tha Egle Warior?"
-    answer = generate_response(query, [])
+    answer, _ = generate_response(query, [])
 
     assert answer
     assert expected_answer in answer

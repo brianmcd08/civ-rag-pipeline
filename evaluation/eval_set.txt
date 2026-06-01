@@ -34,9 +34,6 @@ Petra
 10) What tech does Printing require in 7.4?
 Machinery
 
-11) How did Craftsmanship civic boost change from 6.5 to 7.1?
-In BBG 6.5, it's immprove 3 tiles. In 7.1 it's improve 2 tiles.
-
 12) Name the unique unit for Cree.
 Okihtcitaw
 

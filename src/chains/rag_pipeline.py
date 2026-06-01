@@ -4,7 +4,7 @@ from src.chains import version_extractor as ve
 from src.retrieval.retriever import vectorstore_connection
 
 
-def rag_pipeline(query: str, history: list) -> list[Document]:
+def _rag_pipeline(query: str, history: list) -> list[Document]:
     """
     Ties everything together — runs the extraction pipeline to get a
     cleaned query, version, and section hint, then retrieves relevant
