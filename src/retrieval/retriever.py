@@ -8,7 +8,7 @@ from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 
-from src.config import Version
+from src.config import Section, Version
 from src.secrets import get_secret
 
 os.environ["OPENAI_API_KEY"] = get_secret("OPENAI_API_KEY")
@@ -26,7 +26,7 @@ class Retriever:
         self,
         query: str,
         version: str | None = Version.get_latest_version(),
-        section_hint: str | None = None,
+        section_hint: Section | None = None,
     ) -> list[Document]:
         """
         Retrieve relevant documents for a query.

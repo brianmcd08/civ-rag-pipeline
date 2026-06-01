@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from src.config import Section, Version
 
 
-class ParsedInput(BaseModel):
+class ParsedQuery(BaseModel):
     """
     Cleaned data after raw input from user
     """
@@ -22,11 +22,6 @@ class ParsedInput(BaseModel):
         default=Version.get_latest_version(),
     )
 
-    section_hint: Section | None = Field(
-        description="The BBG section most relevant to this query, if clearly inferable",
-        default=None,
-    )
-
     @field_validator("version", mode="before")
     @classmethod
     def parse_null_version(cls, v):
@@ -34,7 +29,14 @@ class ParsedInput(BaseModel):
             return None
         return v
 
-    @field_validator("section_hint", mode="before")
+
+class RoutingDecision(BaseModel):
+    section_hints: list[Section] | None = Field(
+        description="The BBG section(s) most relevant to this query",
+        default=None,
+    )
+
+    @field_validator("section_hints", mode="before")
     @classmethod
     def parse_null_section(cls, v):
         if v == "null" or v == "none" or v == "None":
