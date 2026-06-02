@@ -97,7 +97,6 @@ pytest
 ## Limitations
 
 - **Base game reference data** (promotion trees, vanilla unit stats) is not included — the chatbot covers BBG balance changes only. For base game lookups, refer to the [Civilization Wiki](https://civilization.fandom.com/wiki/Civilization_VI).
-- **Version number claims** — the model occasionally states version numbers (e.g., "available since v7.1") that are not present in the retrieved source documents. This is a known limitation of the Montezuma persona prompt and is documented as a v3 investigation item.
 
 ---
 
