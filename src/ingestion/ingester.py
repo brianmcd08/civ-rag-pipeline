@@ -1,9 +1,12 @@
-from dotenv import load_dotenv
-from langchain_openai import OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
-from pinecone import Pinecone, ServerlessSpec
-
 import os
+import time
+
+from dotenv import load_dotenv
+from langchain_community.retrievers import PineconeHybridSearchRetriever
+from langchain_openai import OpenAIEmbeddings
+from pinecone import Pinecone, ServerlessSpec
+from pinecone_text.sparse import BM25Encoder
+
 import src.scraping.scrape_orchestrator as scrape_orchestrator
 from src.schema import UnifiedEntry
 
@@ -25,43 +28,60 @@ def deduplicate(entries):
     return list(groups.values())
 
 
+def get_texts(entries):
+    return [entry.generate_embedding_text() for entry, _ in entries]
+
+
 def main():
     entries: list[UnifiedEntry] = scrape_orchestrator.run_all()
     print(f"Total scraped entries: {len(entries)}")
     deduplicated_entries = deduplicate(entries)
     print(f"Total after deduplication: {len(deduplicated_entries)}")
 
+    bm25_encoder = BM25Encoder(language="english", remove_stopwords=True, stem=True)
+    bm25_encoder.fit(get_texts(deduplicated_entries))
+    os.makedirs("models", exist_ok=True)
+    bm25_encoder.dump("models/bm25_values.json")
+
+    # wait for index to be available
+    time.sleep(5)
+
+    print("BM25 Encoder successfully fit and saved!")
+
     # Initialize the embedding model
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
     # Initialize Pinecone and ensure index exists
     pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-    index_name = os.environ["PINECONE_INDEX_NAME"]
+    index_name = os.environ["PINECONE_INDEX_NAME_V2"]
 
     if index_name not in [idx.name for idx in pc.list_indexes()]:
         pc.create_index(
             name=index_name,
             dimension=1536,
-            metric="cosine",
+            metric="dotproduct",
             spec=ServerlessSpec(cloud="aws", region="us-east-1"),
         )
         print(f"Created Pinecone index: {index_name}")
     else:
         print(f"Using existing Pinecone index: {index_name}")
 
-    vector_store = PineconeVectorStore(
-        index_name=index_name,
-        embedding=embeddings,
+    retriever = PineconeHybridSearchRetriever(
+        embeddings=embeddings,
+        sparse_encoder=bm25_encoder,
+        index=pc.Index(index_name),
+        top_k=25,
+        alpha=0.5,
     )
 
     for batch in get_batches(deduplicated_entries, 200):
-        texts = [entry.generate_embedding_text() for entry, _ in batch]
+        texts = get_texts(batch)
         metadatas = [
             {**entry.generate_metadata(), "bbg_version": versions}
             for entry, versions in batch
         ]
         ids = [entry.generate_hash() for entry, _ in batch]
-        vector_store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+        retriever.add_texts(texts=texts, metadatas=metadatas, ids=ids)
         print(f"Upserted batch of {len(batch)}")
 
     print("Ingestion complete.")

@@ -1,9 +1,10 @@
 from src.chains.version_extractor import run_extraction_pipeline
+from src.config import Version
 from src.schema import ParsedQuery, RoutingDecision
 
 
 def test_extractor_no_version_specified():
-    expected_version = "7.4"
+    expected_version = Version.get_latest_version()
 
     query = "Whech Great Gneral gives you the Art of War?"
     query_result, _ = run_extraction_pipeline(query, [])

@@ -1,8 +1,9 @@
 from src.chains.response_generator import generate_response
+from src.config import Version
 
 
 def test_generate_response():
-    expected_answer = "7.4"
+    expected_answer = Version.get_latest_version()
 
     query = "Whaz thel atest verzion that haz tha Egle Warior?"
     answer, _ = generate_response(query, [])
@@ -12,12 +13,13 @@ def test_generate_response():
 
 
 def testgenerate_response_no_version_specified():
-    expected_version = "7.4"
+    expected_version = Version.get_latest_version()
     expected_answer = "Sun Tzu"
 
     query = "Whech Great Gneral gives you the Art of War?"
     _, results = generate_response(query, [])
 
+    # print([doc.metadata for doc in results])
     assert len(results) >= 1
     assert any(expected_version in doc.metadata["bbg_version"] for doc in results)
     assert any(expected_answer in doc.page_content for doc in results)

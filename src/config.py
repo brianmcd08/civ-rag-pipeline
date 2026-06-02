@@ -2,6 +2,7 @@ from enum import StrEnum
 
 
 class Version(StrEnum):
+    V75 = "7.5"
     V74 = "7.4"
     V73 = "7.3"
     V72 = "7.2"

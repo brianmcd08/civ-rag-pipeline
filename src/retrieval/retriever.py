@@ -1,13 +1,12 @@
-# Given a clean query string and an optional version string (parsed from the chain),
-# return relevant Documents. This file knows nothing about LLMs or intent parsing.
-
 import os
-from typing import Any
+from typing import Any, cast
 
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
-from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
+from pinecone import Pinecone, QueryResponse, SparseValues
+from pinecone_text.sparse import BM25Encoder, SparseVector
 
 from src.schema import RetrieverState
 from src.secrets import get_secret
@@ -15,10 +14,48 @@ from src.secrets import get_secret
 os.environ["OPENAI_API_KEY"] = get_secret("OPENAI_API_KEY")
 os.environ["PINECONE_API_KEY"] = get_secret("PINECONE_API_KEY")
 
-vector_store = PineconeVectorStore(
-    index_name=get_secret("PINECONE_INDEX_NAME"),
-    embedding=OpenAIEmbeddings(model="text-embedding-3-small"),
-)
+pc = Pinecone(api_key=get_secret("PINECONE_API_KEY"))
+index = pc.Index(get_secret("PINECONE_INDEX_NAME_V2"))
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+bm25_encoder = BM25Encoder()
+bm25_encoder.load("models/bm25_values.json")
+ALPHA = 0.5
+
+
+def hybrid_query(
+    query: str, k: int, filter: dict[str, Any] | None = None
+) -> list[Document]:
+    dense = embeddings.embed_query(query)
+    sparse_result = bm25_encoder.encode_queries(query)
+    sparse: SparseVector = (
+        sparse_result if isinstance(sparse_result, dict) else sparse_result[0]
+    )
+    scaled_dense = [v * ALPHA for v in dense]
+    scaled_sparse = SparseValues(
+        indices=cast(list[int], sparse["indices"]),
+        values=[v * (1 - ALPHA) for v in sparse["values"]],
+    )
+
+    result = cast(
+        QueryResponse,
+        index.query(
+            vector=scaled_dense,
+            sparse_vector=scaled_sparse,
+            top_k=k,
+            filter=filter,
+            include_metadata=True,
+        ),
+    )
+
+    return [
+        Document(
+            page_content=match.metadata.get("context", ""),
+            metadata={
+                key: val for key, val in match.metadata.items() if key != "context"
+            },
+        )
+        for match in result.matches
+    ]
 
 
 def retrieval(state: RetrieverState):
@@ -48,7 +85,7 @@ def retrieval(state: RetrieverState):
         list[Document]
     """
 
-    print("retrieval called")
+    # print("retrieval called")
 
     pinecone_filter: dict[str, Any]
     k = 25
@@ -68,12 +105,12 @@ def retrieval(state: RetrieverState):
         pinecone_filter = {"section": {"$ne": "names"}}
         k = 40
 
-    result = vector_store.similarity_search(state["query"], k=k, filter=pinecone_filter)
+    result = hybrid_query(state["query"], k=k, filter=pinecone_filter)
 
     # Fallback: if the filtered search returned nothing at all, retry
     # completely unfiltered so we never return an empty result when docs exist.
     if not result:
-        result = vector_store.similarity_search(state["query"], k=25)
+        result = hybrid_query(state["query"], k=25)
 
     return {"documents": result}
 

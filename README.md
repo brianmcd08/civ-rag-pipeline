@@ -1,6 +1,6 @@
 # RAG Pipeline — Civilization 6 Domain
 
-A RAG-based chatbot that answers questions about the Better Game Balance (BBG) mod for Civilization VI. Ask it about unit stats, leader abilities, balance changes across versions, wonders, policies, and more : with full awareness of which BBG version introduced or changed something. For extra fun, ask for opinions.
+A RAG-based chatbot that answers questions about the Better Game Balance (BBG) mod for Civilization VI. Ask it about unit stats, leader abilities, balance changes across versions, wonders, policies, and more — with full awareness of which BBG version introduced or changed something. For extra fun, ask for opinions.
 
 🟢 **Live app:** [civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app](https://civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app/) *(password required)*
 
@@ -10,11 +10,12 @@ Live demo requires password due to API costs — screenshots at the bottom.
 
 ## How it works
 
-1. **Scraping** : BeautifulSoup scrapers pull data from the BBG patch notes pages across 4 versions (`v7.1` through `v7.4`, plus `base_game`), covering units, leaders, buildings, wonders, policies, great people, changelogs, and more.
-2. **Ingestion** : Scraped entries are embedded with OpenAI's `text-embedding-3-small` model and upserted into a Pinecone cloud vector database.
-3. **Retrieval** : At query time, a version extractor (Claude) parses the user's question to determine which BBG version they're asking about and which section of data is most relevant. The retriever then performs a filtered similarity search.
-4. **Generation** : Retrieved documents are passed to Claude along with the original question to generate a response.
-5. **UI** : A Streamlit app serves the chatbot with session-based conversation history.
+1. **Scraping** : BeautifulSoup scrapers pull data from the BBG patch notes pages across all supported versions (`v7.1` through `v7.5`, plus `base_game`), covering units, leaders, buildings, wonders, policies, great people, changelogs, and more.
+2. **Ingestion** : Scraped entries are embedded with OpenAI's `text-embedding-3-small` model (dense vectors) and encoded with a fitted BM25 encoder (sparse vectors). Both are upserted together into a Pinecone cloud vector database per record.
+3. **Extraction** : At query time, a two-agent pipeline (Claude) processes the user's question. The Query Parser cleans the query and extracts the target BBG version. The Section Router classifies which section(s) of data the question targets — returning a list to support multi-section queries.
+4. **Retrieval** : A LangGraph supervisor fans out to parallel retrieval nodes — one per section — and merges the results. Each node issues a hybrid query combining dense semantic search and BM25 sparse keyword search, with version and section metadata filters applied per call.
+5. **Generation** : Retrieved documents are passed to Claude along with the original question to generate a response.
+6. **UI** : A Streamlit app serves the chatbot with session-based conversation history.
 
 ---
 
@@ -29,16 +30,22 @@ src/
 │   ├── scrape_changelogs.py
 │   └── ...
 ├── ingestion/
-│   └── ingester.py     # Embeds scraped data and upserts into Pinecone
+│   └── ingester.py     # Embeds scraped data, fits BM25 encoder, upserts into Pinecone
 ├── retrieval/
-│   └── retriever.py    # Version- and section-aware similarity search
+│   └── retrieval.py    # LangGraph supervisor + hybrid retrieval nodes
 ├── chains/
-│   ├── version_extractor.py    # Parses version and section from query
-│   ├── rag_pipeline.py         # Wires extractor → retriever
+│   ├── query_parser.py         # Agent 1: cleans query, extracts version
+│   ├── section_router.py       # Agent 2: routes to one or more sections
 │   └── response_generator.py  # Final LLM call with retrieved context
-├── schema.py           # UnifiedEntry and ParsedInput data models
+├── schema.py           # UnifiedEntry, ParsedQuery, RoutingDecision, RetrieverState
 ├── config.py           # Version and Section enums
 └── secrets.py          # Reads from st.secrets (cloud) or .env (local)
+evaluation/             # RAG triad eval pipeline
+├── context_relevance_judge.py  # Did retrieval surface the right chunks?
+├── grounding.py                # Is the response supported by retrieved chunks?
+└── answer_relevance.py         # Does the response answer the question?
+models/
+└── bm25_values.json    # Fitted BM25 encoder — generated at ingestion time
 app.py                  # Streamlit UI
 ```
 
@@ -46,26 +53,30 @@ app.py                  # Streamlit UI
 
 ## Querying
 
-The chatbot understands version-specific and cross-version questions:
+The chatbot understands version-specific, cross-version, and multi-section questions:
 
 | Query | Behaviour |
 |---|---|
-| "What does the Eagle Warrior do?" | Searches BBG v7.4 (latest) |
+| "What does the Eagle Warrior do?" | Searches BBG v7.5 (latest) |
 | "What did the Knight cost in v7.1?" | Filters to v7.1 |
 | "Which versions have the Eagle Warrior?" | Searches across all versions |
-| "What are the ranged unit promotions?" | Targets the promotions section |
+| "Which civilization has the Ice Hockey Rink?" | Searches improvements + leaders in parallel |
 
 ---
 
 ## Re-ingestion
 
-`ingester.py` is an admin-only local script. If you modify any scraper or the `generate_embedding_text()` method in `schema.py`, re-run the ingester to push updated vectors to Pinecone:
+`ingester.py` is an admin-only local script. If you modify any scraper, the `generate_embedding_text()` method in `schema.py`, or add a new BBG version to the `Version` enum, re-run the ingester to push updated vectors to Pinecone:
 
 ```bash
-python -m src.ingestion.ingester
+uv run python -m src.ingestion.ingester
 ```
 
-Before re-ingesting, clear the Pinecone index manually (via the Pinecone console or API) to avoid stale or duplicate vectors.
+The ingester upserts by ID (entry hash), so re-running is additive — existing vectors are overwritten only if the content hash changes, and new entries are added. You do not need to clear the Pinecone index manually before re-ingesting.
+
+The ingester also re-fits the BM25 encoder on the full corpus and overwrites `models/bm25_values.json`. Commit the updated file after re-ingesting.
+
+**To add a new BBG version:** add the new version as the first entry in the `Version` enum in `config.py`. The scraper and ingester pick it up automatically on next run.
 
 ---
 
@@ -79,13 +90,14 @@ pytest
 
 ## BBG versions covered
 
-`7.1`, `7.2`, `7.3`, `7.4`
+`base_game`, `7.1`, `7.2`, `7.3`, `7.4`, `7.5`
 
 ---
 
 ## Limitations
 
 - **Base game reference data** (promotion trees, vanilla unit stats) is not included — the chatbot covers BBG balance changes only. For base game lookups, refer to the [Civilization Wiki](https://civilization.fandom.com/wiki/Civilization_VI).
+- **Version number claims** — the model occasionally states version numbers (e.g., "available since v7.1") that are not present in the retrieved source documents. This is a known limitation of the Montezuma persona prompt and is documented as a v3 investigation item.
 
 ---
 

@@ -45,7 +45,7 @@ def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
         }
     )
 
-    print(f"docs = {docs}")
+    # print(f"docs = {docs}")
 
     if not docs["documents"]:
         response = "Sorry I need more information."
