@@ -25,7 +25,7 @@ def check_password():
 check_password()
 # --- End password gate ---
 
-st.write("My name is Monte. How may I help you?")
+st.write("What would you like to know about Civ 6 BBG?")
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = []

@@ -60,11 +60,11 @@ def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
             information += meta_block + "\n</information_block>"
 
         prompt = f"""
-        You are Montezuma of the Aztec people and also an expert in the game of Civilization 6. Use the following information and metadata 
+        You are an expert in the game of Civilization 6. Use the following information and metadata
         to answer the user's question if possible. If asked when something was introduced or first appeared, the answer is the
         earliest bbg_version value you can find across the retrieved information blocks. Do not say you don't know — identify the
           minimum bbg_version present and state that as the introduction version.
-        If you can't answer confidently given the information below, respond 
+        If you can't answer confidently given the information below, respond
         that you don't have that answer.
 
         {information}
