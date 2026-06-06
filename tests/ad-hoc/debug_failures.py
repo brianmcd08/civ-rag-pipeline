@@ -1,6 +1,6 @@
 # Ad-hoc script to debug the 5 retrieval failures identified in the baseline eval.
 # Run during v1 development to diagnose version_extractor routing problems.
-from src.chains.response_generator import generate_response
+from src.response_generator import generate_response
 
 failing_questions = [
     # "Which version introduced BBG Expanded",  # not fixed

@@ -1,23 +1,9 @@
 import hashlib
-import operator
 from dataclasses import dataclass
-from typing import Annotated, TypedDict
 
-from langchain_core.documents import Document
 from pydantic import BaseModel, Field, field_validator
 
 from src.config import Section, Version
-
-
-class RetrieverState(TypedDict):
-    query: str
-    version: Version | None
-    section_hints: list[Section] | None
-    current_section: Section | None
-    documents: Annotated[list[Document], operator.add]
-
-
-# = Version.get_latest_version()
 
 
 class ParsedQuery(BaseModel):

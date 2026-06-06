@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from src.chains import version_extractor as ve
+from src.retrieval import version_extractor as ve
 from src.config import ANTHROPIC_MODEL
 from src.retrieval.retriever import graph
 from src.secrets import get_secret

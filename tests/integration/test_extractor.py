@@ -1,4 +1,4 @@
-from src.chains.version_extractor import run_extraction_pipeline
+from src.retrieval.version_extractor import run_extraction_pipeline
 from src.config import Version
 from src.schema import ParsedQuery, RoutingDecision
 

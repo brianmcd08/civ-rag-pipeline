@@ -1,4 +1,4 @@
-from src.chains.response_generator import generate_response
+from src.response_generator import generate_response
 from src.config import Version
 
 

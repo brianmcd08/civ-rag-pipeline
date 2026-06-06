@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from evaluation.answer_relevance import answer_relevance_judge
 from evaluation.context_relevance_judge import context_relevance_judge
 from evaluation.grounding import grounding_judge
-from src.chains.response_generator import generate_response
+from src.response_generator import generate_response
 
 load_dotenv()
 client = anthropic.Anthropic()
@@ -61,7 +61,7 @@ fieldnames = [
 
 
 async def main():
-    with open("judgment.csv", "w", newline="") as file:
+    with open("evaluation/judgment.csv", "w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for item in items:

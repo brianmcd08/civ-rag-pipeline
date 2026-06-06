@@ -1,6 +1,6 @@
 import streamlit as st
 
-from src.chains.response_generator import generate_response
+from src.response_generator import generate_response
 from src.config import HISTORY_LIMIT
 
 st.title("Civilization 6 Chatbot")
