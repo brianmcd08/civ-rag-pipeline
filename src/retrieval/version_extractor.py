@@ -1,14 +1,9 @@
-import os
 from typing import cast
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from src.config import ANTHROPIC_MODEL, Section, Version
+from src.config import Section, Version, llm
 from src.schema import ParsedQuery, RoutingDecision
-from src.secrets import get_secret
-
-os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
 
 
 def query_parser(query: str, history: list) -> ParsedQuery:
@@ -22,7 +17,7 @@ def query_parser(query: str, history: list) -> ParsedQuery:
         ParsedQuery: clean query, and version
     """
 
-    llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
+    # llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
     structured_llm = llm.with_structured_output(ParsedQuery)
     versions = Version.to_list_of_strings()
     latest_version = Version.get_latest_version()
@@ -67,7 +62,7 @@ def section_router(cleaned_query: str) -> RoutingDecision:
     Infer a section_hint when the query clearly targets one section
     """
 
-    llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
+    # llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
     structured_llm = llm.with_structured_output(RoutingDecision)
     sections = "\n".join([s.value for s in Section])
 
@@ -76,14 +71,14 @@ def section_router(cleaned_query: str) -> RoutingDecision:
 
     1) SECTION HINT
     If the query clearly targets one or more sections, set section_hint to a list
-    of matching section values. If the query is too broad to target any sections, 
+    of matching section values. If the query is too broad to target any sections,
     set it to null.
-    
+
     Here are the valid section values:
     <Sections>
     {sections}
     </Sections>
-    
+
     Examples:
     - "which versions have the Eagle Warrior?" → section_hint: ["units"]
     - "what does the Monument building do?" → section_hint: ["buildings"]

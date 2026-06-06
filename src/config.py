@@ -1,4 +1,11 @@
+import os
+
+from langchain_anthropic import ChatAnthropic
 from enum import StrEnum
+from src.secrets import get_secret
+
+
+os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
 
 
 class Version(StrEnum):
@@ -41,4 +48,6 @@ class Section(StrEnum):
 
 ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_JUDGE = "claude-sonnet-4-6"
-HISTORY_LIMIT = 20
+HISTORY_LIMIT = 4
+
+llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)

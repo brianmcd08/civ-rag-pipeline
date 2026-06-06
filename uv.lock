@@ -484,6 +484,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "jupyterlab" },
+    { name = "langchain" },
     { name = "langchain-anthropic" },
     { name = "langchain-community" },
     { name = "langchain-openai" },
@@ -505,6 +506,7 @@ dev = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
     { name = "jupyterlab", specifier = ">=4.5.6" },
+    { name = "langchain", specifier = ">=1.3.4" },
     { name = "langchain-anthropic", specifier = ">=1.4.1" },
     { name = "langchain-community", specifier = ">=0.4.2" },
     { name = "langchain-openai", specifier = ">=1.1.14" },
@@ -1264,6 +1266,20 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain"
+version = "1.3.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "langgraph" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/3f/034eb6cbef90bfccc89b7f8ed0c1d853dc9cb0bea17c7a269534c647ba3a/langchain-1.3.4.tar.gz", hash = "sha256:d6e0654c22848925534f5c0a706f9be481bb09a619ec60a738fbd1e5502e457a", size = 606617, upload-time = "2026-06-02T20:04:49.411Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a5/29/9ffe99c7dc4891a0215ec59c423bea320f943c08a231bc5bae392a438a83/langchain-1.3.4-py3-none-any.whl", hash = "sha256:e51b05ab23d056bc6bf2d97d8c694fb92d6d5765126fef74565d007c27581672", size = 125286, upload-time = "2026-06-02T20:04:48.13Z" },
+]
+
+[[package]]
 name = "langchain-anthropic"
 version = "1.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1395,7 +1411,7 @@ wheels = [
 
 [[package]]
 name = "langgraph"
-version = "1.2.3"
+version = "1.2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
@@ -1405,9 +1421,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "xxhash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/55/e42f59b5e4cce75085f68abb77114c4d1152628157bd60c2587881bca559/langgraph-1.2.3.tar.gz", hash = "sha256:7f89cd5f0946fe29bd7ca048e2a84d3c14e7f652e38bb98e00f0ba8b7004b9d0", size = 718812, upload-time = "2026-06-01T18:55:54.458Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/43/dac5a2621c1e57f8eb7f0703f6f6fe34a5caf62f8f0fb4d2bb395bb454ea/langgraph-1.2.4.tar.gz", hash = "sha256:5df076973a2d23efb13eceb279d1e5b46feebcbbeded0a86a2ef669abd9e4399", size = 720374, upload-time = "2026-06-02T17:07:37.347Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/9b/287f11be799f2f4dd289ab19d23788df22ac20ce884a010d0696f79016db/langgraph-1.2.3-py3-none-any.whl", hash = "sha256:22e6c89084adb3edb7855f6ffa692af3d75925f9c70deb43b86da14db1b02c78", size = 244841, upload-time = "2026-06-01T18:55:52.945Z" },
+    { url = "https://files.pythonhosted.org/packages/48/9e/31ca236104966d7bb14ea9e93cfd73350aea8c41008ddf057b65794ed10d/langgraph-1.2.4-py3-none-any.whl", hash = "sha256:ffe3e1e31dce28907640f82525858470f293506d2b272d07ea3b3ce97974b067", size = 245402, upload-time = "2026-06-02T17:07:35.977Z" },
 ]
 
 [[package]]
