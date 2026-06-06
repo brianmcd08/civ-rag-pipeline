@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
-results = hybrid_query("Guru charges", k=5, filter={"section": {"$eq": "units"}})
-for doc in results:
-    print(doc.metadata)
+docs = hybrid_query("leader ability", k=3, filter={"section": {"$eq": "leaders"}})
+for doc in docs:
+    # print(doc.metadata)
+    print(len(doc.page_content))
     print(doc.page_content)
     print("---")

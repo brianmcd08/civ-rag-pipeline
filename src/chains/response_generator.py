@@ -10,19 +10,9 @@ from src.chains import version_extractor as ve
 from src.config import ANTHROPIC_MODEL
 from src.retrieval.retriever import graph
 from src.secrets import get_secret
+from src.utils import format_docs
 
 os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
-
-
-def format_docs(docs: list[Document]) -> str:
-    information = ""
-    for doc in docs:
-        information += f"<information_block>\n{doc.page_content[:1500]}\n\n"
-        meta_block = ", ".join(
-            [f"{key}: {value}" for key, value in doc.metadata.items()]
-        )
-        information += meta_block + "\n</information_block>"
-    return information
 
 
 def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
@@ -43,7 +33,7 @@ def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
         else:
             converted_history.append(AIMessage(content=msg["content"]))
 
-    recent_history = history[-4:]
+    recent_history = converted_history[-4:]
     parsed_query, routing_decision = ve.run_extraction_pipeline(query, recent_history)
 
     docs = graph.invoke(
