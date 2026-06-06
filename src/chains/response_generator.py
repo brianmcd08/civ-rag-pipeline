@@ -14,6 +14,17 @@ from src.secrets import get_secret
 os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
 
 
+def format_docs(docs: list[Document]) -> str:
+    information = ""
+    for doc in docs:
+        information += f"<information_block>\n{doc.page_content[:1500]}\n\n"
+        meta_block = ", ".join(
+            [f"{key}: {value}" for key, value in doc.metadata.items()]
+        )
+        information += meta_block + "\n</information_block>"
+    return information
+
+
 def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
     """
     The entire pipeline
@@ -45,19 +56,11 @@ def generate_response(query: str, history: list) -> tuple[str, list[Document]]:
         }
     )
 
-    # print(f"docs = {docs}")
-
     if not docs["documents"]:
         response = "Sorry I need more information."
 
     else:
-        information = ""
-        for doc in docs["documents"]:
-            information += f"<information_block>\n{doc.page_content}\n\n"
-            meta_block = ", ".join(
-                [f"{key}: {value}" for key, value in doc.metadata.items()]
-            )
-            information += meta_block + "\n</information_block>"
+        information = format_docs(docs["documents"])
 
         prompt = f"""
         You are an expert in the game of Civilization 6. Use the following information and metadata
