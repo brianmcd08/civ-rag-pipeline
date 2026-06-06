@@ -10,7 +10,7 @@ Line of Sight: 2
 2) Which wonder gives a Great Prophet?
 Stonehenge
 
-3) Which religious unit heals others?
+3) Which religious unit's primary responsibility is to heal other religious units?
 Guru
 
 4) Which governor has Black Marketeer?
@@ -22,37 +22,30 @@ Mine a resource
 6) Name the Mayan leaders.
 Te'K'inich II and Lady Six Sky
 
-7) Name the cultural city-states.
-Antananarivo, Ayutthaya, Caguana, Kumasi, Mohenjo-Daro, Nan Madol, Rapa Nui, Vilnius
-
-8) Name all leaders for China.
+7) Name all leaders for China.
 Kublai Khan, Qin (Mandate of Heaven), Qin (Unifier), Wu Zetian, Yongle
 
-9) Which wonder is unlocked by Mathematics in 7.4?
+8) Which wonder is unlocked by Mathematics in 7.4?
 Petra
 
-10) What tech does Printing require in 7.4?
+9) What tech does Printing require in 7.4?
 Machinery
 
-12) Name the unique unit for Cree.
+10) Name the unique unit for Cree.
 Okihtcitaw
 
-13) What is the Warak'aq?
+11) What is the Warak'aq?
 Recon unit for Inca replacing the skirmisher
 
-14) Name the Gallic unique unit.
+12) Name the Gallic unique unit.
 Gaesatae
 
-15) Name a leader from BBG Expanded.
-Gaul/Vercingetorix, Macedon/Olympias, Maya/Te'K'inich II, Phoenicia/Ahiram, Swahili/Al-Hasan ibn Sulaiman
-Teotihuacan/Spearthrower Owl, Thule/Kiviuq, Tibet/Trisong Detsen
-
-16) What are the benefits that Alan Turing provides?
+13) What are the benefits that Alan Turing provides?
 Great Scientist who Triggers the Eureka for Computers and 1 random technology from the Modern era. If Computers technology is already triggered, instead completes Computers technology.
 
-17) What does Matterhorn do?
+14) What does Matterhorn do?
 Land combat units who move next to the Matterhorn ignore Hills for the rest of the game.
 
-18) What is the Migration Treaty?
+15) What is the Migration Treaty?
 +20% faster Population growth but -5 Loyalty per turn in this player's cities.
 or +5 Loyalty per turn but -20% Population growth in this player's cities.

@@ -41,7 +41,7 @@ def parse_eval_file(filepath: str) -> list:
             result = {}
             # result["id"] = id
             result["question"] = question.strip()
-            # result["answer"] = answer.strip()
+            result["ideal_answer"] = answer.strip()
 
             results.append(result)
     return results
@@ -50,6 +50,7 @@ def parse_eval_file(filepath: str) -> list:
 items = parse_eval_file("./evaluation/eval_set.txt")
 fieldnames = [
     "question",
+    "ideal_answer",
     "context_score",
     "context_reasoning",
     "grounding_score",
@@ -65,12 +66,13 @@ async def main():
         writer.writeheader()
         for item in items:
             query = item["question"]
+            ideal_answer = item["ideal_answer"]
             response, documents = generate_response(query, [])
 
             context_result, grounding_result, answer_result = await asyncio.gather(
                 context_relevance_judge(documents, query),
                 grounding_judge(documents, response),
-                answer_relevance_judge(query, response),
+                answer_relevance_judge(ideal_answer, response),
             )
 
             item["context_score"] = context_result.score
