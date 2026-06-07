@@ -30,20 +30,6 @@ class ParsedQuery(BaseModel):
         return v
 
 
-class RoutingDecision(BaseModel):
-    section_hints: list[Section] | None = Field(
-        description="The BBG section(s) most relevant to this query",
-        default=None,
-    )
-
-    @field_validator("section_hints", mode="before")
-    @classmethod
-    def parse_null_section(cls, v):
-        if v == "null" or v == "none" or v == "None":
-            return None
-        return v
-
-
 @dataclass
 class UnifiedEntry:
     """

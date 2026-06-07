@@ -49,5 +49,6 @@ class Section(StrEnum):
 ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_JUDGE = "claude-sonnet-4-6"
 HISTORY_LIMIT = 4
+RECURSION_LIMIT = 10
 
 llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
