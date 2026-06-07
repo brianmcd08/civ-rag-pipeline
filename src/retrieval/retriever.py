@@ -6,6 +6,7 @@ from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone, QueryResponse, SparseValues
 from pinecone_text.sparse import BM25Encoder, SparseVector
 
+from src.config import ALPHA, BM25_MODEL_PATH, EMBEDDINGS_MODEL
 from src.secrets import get_secret
 
 os.environ["OPENAI_API_KEY"] = get_secret("OPENAI_API_KEY")
@@ -13,10 +14,9 @@ os.environ["PINECONE_API_KEY"] = get_secret("PINECONE_API_KEY")
 
 pc = Pinecone(api_key=get_secret("PINECONE_API_KEY"))
 index = pc.Index(get_secret("PINECONE_INDEX_NAME_V2"))
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+embeddings = OpenAIEmbeddings(model=EMBEDDINGS_MODEL)
 bm25_encoder = BM25Encoder()
-bm25_encoder.load("models/bm25_values.json")
-ALPHA = 0.5
+bm25_encoder.load(BM25_MODEL_PATH)
 
 
 def hybrid_query(

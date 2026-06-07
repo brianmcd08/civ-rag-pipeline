@@ -19,6 +19,7 @@ def generate_response(query: str, history: list, thread_id: str) -> str:
     result = agent.invoke(
         {"messages": [{"role": "user", "content": message}]}, config=config
     )
+
     response = result["messages"][-1].content
 
     return response

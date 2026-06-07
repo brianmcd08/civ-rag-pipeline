@@ -1,4 +1,5 @@
 from langchain_core.tools import tool
+from src.config import K_GENERAL, K_SECTION
 from src.retrieval.retriever import hybrid_query
 from src.utils import format_docs
 
@@ -20,7 +21,9 @@ def search_units(query: str, version: str | None = None) -> str:
     Pass version if the user specified one."""
     section_filter = {"section": {"$eq": "units"}}
     docs = hybrid_query(
-        query, k=5, filter=_build_filter(section_filter=section_filter, version=version)
+        query,
+        k=K_SECTION,
+        filter=_build_filter(section_filter=section_filter, version=version),
     )
     return format_docs(docs)
 
@@ -31,7 +34,9 @@ def search_leaders(query: str, version: str | None = None) -> str:
     Pass version if the user specified one."""
     section_filter = {"section": {"$eq": "leaders"}}
     docs = hybrid_query(
-        query, k=5, filter=_build_filter(section_filter=section_filter, version=version)
+        query,
+        k=K_SECTION,
+        filter=_build_filter(section_filter=section_filter, version=version),
     )
     return format_docs(docs)
 
@@ -42,7 +47,9 @@ def search_great_people(query: str, version: str | None = None) -> str:
     Pass version if the user specified one."""
     section_filter = {"section": {"$eq": "great_people"}}
     docs = hybrid_query(
-        query, k=5, filter=_build_filter(section_filter=section_filter, version=version)
+        query,
+        k=K_SECTION,
+        filter=_build_filter(section_filter=section_filter, version=version),
     )
     return format_docs(docs)
 
@@ -53,7 +60,9 @@ def search_techs_and_civics(query: str, version: str | None = None) -> str:
     Pass version if the user specified one."""
     section_filter = {"section": {"$in": ["tech_tree", "civic_tree"]}}
     docs = hybrid_query(
-        query, k=5, filter=_build_filter(section_filter=section_filter, version=version)
+        query,
+        k=K_SECTION,
+        filter=_build_filter(section_filter=section_filter, version=version),
     )
     return format_docs(docs)
 
@@ -64,7 +73,9 @@ def search_buildings_and_improvements(query: str, version: str | None = None) ->
     Pass version if the user specified one."""
     section_filter = {"section": {"$in": ["buildings", "improvements"]}}
     docs = hybrid_query(
-        query, k=5, filter=_build_filter(section_filter=section_filter, version=version)
+        query,
+        k=K_SECTION,
+        filter=_build_filter(section_filter=section_filter, version=version),
     )
     return format_docs(docs)
 
@@ -74,6 +85,6 @@ def search_general(query: str, version: str | None = None) -> str:
     """Search for changelogs, policies, congress, religion, natural wonders, world wonders, bbg expanded, governors, city states, names of things, era dedications
     Pass version if the user specified one."""
     docs = hybrid_query(
-        query, k=8, filter=_build_filter(section_filter=None, version=version)
+        query, k=K_GENERAL, filter=_build_filter(section_filter=None, version=version)
     )
     return format_docs(docs)

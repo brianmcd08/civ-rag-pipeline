@@ -7,6 +7,16 @@ from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone, ServerlessSpec
 from pinecone_text.sparse import BM25Encoder
 
+from src.config import (
+    ALPHA,
+    BM25_MODEL_PATH,
+    EMBEDDINGS_MODEL,
+    INDEX_CLOUD,
+    INDEX_DIMENSION,
+    INDEX_METRIC,
+    INDEX_REGION,
+    K_INGEST,
+)
 import src.scraping.scrape_orchestrator as scrape_orchestrator
 from src.schema import UnifiedEntry
 
@@ -41,7 +51,7 @@ def main():
     bm25_encoder = BM25Encoder(language="english", remove_stopwords=True, stem=True)
     bm25_encoder.fit(get_texts(deduplicated_entries))
     os.makedirs("models", exist_ok=True)
-    bm25_encoder.dump("models/bm25_values.json")
+    bm25_encoder.dump(BM25_MODEL_PATH)
 
     # wait for index to be available
     time.sleep(5)
@@ -49,7 +59,7 @@ def main():
     print("BM25 Encoder successfully fit and saved!")
 
     # Initialize the embedding model
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    embeddings = OpenAIEmbeddings(model=EMBEDDINGS_MODEL)
 
     # Initialize Pinecone and ensure index exists
     pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
@@ -58,9 +68,9 @@ def main():
     if index_name not in [idx.name for idx in pc.list_indexes()]:
         pc.create_index(
             name=index_name,
-            dimension=1536,
-            metric="dotproduct",
-            spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+            dimension=INDEX_DIMENSION,
+            metric=INDEX_METRIC,
+            spec=ServerlessSpec(cloud=INDEX_CLOUD, region=INDEX_REGION),
         )
         print(f"Created Pinecone index: {index_name}")
     else:
@@ -70,8 +80,8 @@ def main():
         embeddings=embeddings,
         sparse_encoder=bm25_encoder,
         index=pc.Index(index_name),
-        top_k=25,
-        alpha=0.5,
+        top_k=K_INGEST,
+        alpha=ALPHA,
     )
 
     for batch in get_batches(deduplicated_entries, 200):

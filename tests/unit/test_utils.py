@@ -1,6 +1,7 @@
 from langchain_core.documents import Document
 import pytest
 
+from src.config import CHUNK_CONTENT_LIMIT
 from src.utils import format_docs
 
 
@@ -36,5 +37,5 @@ def test_format_docs_normal(data):
 def test_format_docs_truncation(data):
     _, p2, docs = data
     result = format_docs([docs[1]])
-    assert "A" * 1500 in result
-    assert "A" * 1501 not in result
+    assert "A" * CHUNK_CONTENT_LIMIT in result
+    assert "A" * (CHUNK_CONTENT_LIMIT + 1) not in result

@@ -46,9 +46,31 @@ class Section(StrEnum):
     WORLDWONDER = "world_wonder"
 
 
+# LLM
 ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_JUDGE = "claude-sonnet-4-6"
+
+# Ingestion
+K_INGEST = 25
+
+# Retrieval
+ALPHA = 0.5
+K_SECTION = 5
+K_GENERAL = 8
+
+# Embeddings
+EMBEDDINGS_MODEL = "text-embedding-3-small"
+BM25_MODEL_PATH = "models/bm25_values.json"
+
+# Pinecone
+INDEX_DIMENSION = 1536
+INDEX_CLOUD = "aws"
+INDEX_METRIC = "dotproduct"
+INDEX_REGION = "us-east-1"
+
+# App
 HISTORY_LIMIT = 4
 RECURSION_LIMIT = 10
+CHUNK_CONTENT_LIMIT = 1500
 
 llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
