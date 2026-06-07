@@ -9,7 +9,7 @@ failing_questions = [
 
 for q in failing_questions:
     print(f"\nQ: {q}")
-    answer = generate_response(q, [])
+    answer = generate_response(q, [], "")
     print(f"  → Answer: {answer}")
     # docs = rag_pipeline(q, [])
     # print(f"  → {len(docs)} docs returned")
