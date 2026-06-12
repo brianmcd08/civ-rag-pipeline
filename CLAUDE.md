@@ -11,7 +11,7 @@ Python, LangGraph (create_react_agent), Pinecone hybrid search, Streamlit.
 
 ## Commands
 - Run tests: `uv run pytest tests/ -v`
-- Run eval: `uv run python evaluation/eval_runner.py`
+- Run eval: `uv run python -m evaluation.eval_runner`
 - Lint: `uv run ruff check src/`
 
 ## Architecture (v4)

@@ -1,6 +1,5 @@
 import anthropic
 from dotenv import load_dotenv
-from langchain_core.documents import Document
 
 from evaluation.schema import PartialJudgment
 from src.config import ANTHROPIC_JUDGE
@@ -40,7 +39,7 @@ grounding_prompt = """
     """
 
 
-async def grounding_judge(chunks: list[Document], response: str) -> PartialJudgment:
+async def grounding_judge(chunks: list[str], response: str) -> PartialJudgment:
     result = client.beta.messages.parse(
         model=ANTHROPIC_JUDGE,
         max_tokens=1024,
@@ -50,7 +49,7 @@ async def grounding_judge(chunks: list[Document], response: str) -> PartialJudgm
                 "role": "user",
                 "content": f"""
                 Response: {response}
-                Documents: {"\n\n".join([c.page_content for c in chunks])}
+                Documents: {"\n\n".join(chunks)}
             """,
             }
         ],

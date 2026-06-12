@@ -1,6 +1,5 @@
 import anthropic
 from dotenv import load_dotenv
-from langchain_core.documents import Document
 
 from evaluation.schema import PartialJudgment
 from src.config import ANTHROPIC_JUDGE
@@ -29,7 +28,7 @@ context_relevance_prompt = """
 
 
 async def context_relevance_judge(
-    chunks: list[Document], query: str
+    chunks: list[str], query: str
 ) -> PartialJudgment:
     result = client.beta.messages.parse(
         model=ANTHROPIC_JUDGE,
@@ -40,7 +39,7 @@ async def context_relevance_judge(
                 "role": "user",
                 "content": f"""
                 Question: {query}
-                Documents: {"\n\n".join([c.page_content for c in chunks])}
+                Documents: {"\n\n".join(chunks)}
             """,
             }
         ],

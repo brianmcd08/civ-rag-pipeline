@@ -1,5 +1,6 @@
 import asyncio
 import csv
+from uuid import uuid4
 
 import anthropic
 from dotenv import load_dotenv
@@ -67,7 +68,7 @@ async def main():
         for item in items:
             query = item["question"]
             ideal_answer = item["ideal_answer"]
-            response, documents = generate_response(query, [])
+            response, documents = generate_response(query, [], str(uuid4()))
 
             context_result, grounding_result, answer_result = await asyncio.gather(
                 context_relevance_judge(documents, query),

@@ -49,6 +49,7 @@ class Section(StrEnum):
 # LLM
 ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_JUDGE = "claude-sonnet-4-6"
+LLM_TIMEOUT = 30
 
 # Ingestion
 K_INGEST = 25
@@ -73,4 +74,5 @@ HISTORY_LIMIT = 4
 RECURSION_LIMIT = 10
 CHUNK_CONTENT_LIMIT = 1500
 
-llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=30)
+
+llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=LLM_TIMEOUT)

@@ -16,7 +16,7 @@ Live demo requires password due to API costs — screenshots at the bottom.
 4. **Agentic retrieval** : A ReAct agent receives the cleaned query and reasons at runtime about which search tools to call. Six tools cover the main content sections (units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all). Each tool issues a hybrid query combining dense semantic search and BM25 sparse keyword search, with version and section metadata filters applied per call. The agent can call multiple tools in sequence when a question spans sections.
 5. **Generation** : The agent synthesizes retrieved results into a response grounded in the source data.
 6. **Memory** : Conversation state is persisted across turns via a `MemorySaver` checkpointer, enabling context-aware follow-up questions without re-stating the subject.
-7. **UI** : A Streamlit app serves the chatbot with per-session thread tracking.
+7. **UI** : A Streamlit app serves the chatbot with per-session thread tracking, a sidebar with an About section and example questions.
 
 ---
 
@@ -43,6 +43,8 @@ src/
 ├── utils.py            # format_docs helper
 └── secrets.py          # Reads from st.secrets (cloud) or .env (local)
 evaluation/             # RAG triad eval pipeline
+├── eval_runner.py              # Runs RAG triad eval across question set
+├── schema.py                   # PartialJudgment and Judgment types
 ├── context_relevance_judge.py  # Did retrieval surface the right chunks?
 ├── grounding.py                # Is the response supported by retrieved chunks?
 └── answer_relevance.py         # Does the response answer the question?
@@ -87,7 +89,7 @@ The ingester also re-fits the BM25 encoder on the full corpus and overwrites `mo
 ## Running tests
 
 ```bash
-pytest
+uv run pytest
 ```
 
 ---
