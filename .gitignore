@@ -211,3 +211,5 @@ __marimo__/
 
 chroma_langchain_db/
 .streamlit/secrets.toml
+
+.claude/
