@@ -6,6 +6,7 @@ from langchain_community.retrievers import PineconeHybridSearchRetriever
 from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone, ServerlessSpec
 from pinecone_text.sparse import BM25Encoder
+from src.logging_config import logger
 
 from src.config import (
     ALPHA,
@@ -44,10 +45,11 @@ def get_texts(entries):
 
 def main():
     entries: list[UnifiedEntry] = scrape_orchestrator.run_all()
-    print(f"Total scraped entries: {len(entries)}")
+    logger.info("Total scraped entries", total_entries=len(entries))
     deduplicated_entries = deduplicate(entries)
-    print(f"Total after deduplication: {len(deduplicated_entries)}")
-
+    logger.info(
+        "Total entries after deduplication", total_entries=len(deduplicated_entries)
+    )
     bm25_encoder = BM25Encoder(language="english", remove_stopwords=True, stem=True)
     bm25_encoder.fit(get_texts(deduplicated_entries))
     os.makedirs("models", exist_ok=True)
@@ -56,7 +58,7 @@ def main():
     # wait for index to be available
     time.sleep(5)
 
-    print("BM25 Encoder successfully fit and saved!")
+    logger.info("BM25 Encoder successfully fit and saved")
 
     # Initialize the embedding model
     embeddings = OpenAIEmbeddings(model=EMBEDDINGS_MODEL)
@@ -72,9 +74,9 @@ def main():
             metric=INDEX_METRIC,
             spec=ServerlessSpec(cloud=INDEX_CLOUD, region=INDEX_REGION),
         )
-        print(f"Created Pinecone index: {index_name}")
+        logger.info("Created Pinecone index", index_name=index_name)
     else:
-        print(f"Using existing Pinecone index: {index_name}")
+        logger.info("Using existing Pinecone index", index_name=index_name)
 
     retriever = PineconeHybridSearchRetriever(
         embeddings=embeddings,
@@ -84,17 +86,41 @@ def main():
         alpha=ALPHA,
     )
 
-    for batch in get_batches(deduplicated_entries, 200):
+    for batch_num, batch in enumerate(get_batches(deduplicated_entries, 200)):
         texts = get_texts(batch)
         metadatas = [
             {**entry.generate_metadata(), "bbg_version": versions}
             for entry, versions in batch
         ]
         ids = [entry.generate_hash() for entry, _ in batch]
-        retriever.add_texts(texts=texts, metadatas=metadatas, ids=ids)
-        print(f"Upserted batch of {len(batch)}")
 
-    print("Ingestion complete.")
+        try:
+            retriever.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+            logger.info(
+                "Batch Upsert",
+                batch_num=batch_num,
+                batch_size=len(batch),
+                sections={m["section"] for m in metadatas},
+                bbg_versions={
+                    bbg_version for m in metadatas for bbg_version in m["bbg_version"]
+                },
+                status="success",
+            )
+        except Exception as error:
+            logger.error(
+                "Batch Upsert",
+                batch_num=batch_num,
+                batch_size=len(batch),
+                sections={m["section"] for m in metadatas},
+                bbg_versions={
+                    bbg_version for m in metadatas for bbg_version in m["bbg_version"]
+                },
+                status="error",
+                error_type=type(error).__name__,
+                error_msg=str(error),
+            )
+
+    logger.info("Ingestion complete")
 
 
 if __name__ == "__main__":
