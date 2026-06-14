@@ -62,7 +62,7 @@ if prompt := st.chat_input("Ask about units, leaders, balance changes, or wonder
 
     with st.chat_message("assistant"):
         prior_messages = st.session_state.messages[-(HISTORY_LIMIT + 1) : -1]
-        answer = generate_response(
+        answer, _ = generate_response(
             prompt, prior_messages, st.session_state["thread_id"]
         )
 
