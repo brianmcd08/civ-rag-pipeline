@@ -1,6 +1,10 @@
 # Architecture: V1 → V5
 
-This is the decision log behind the civ-rag-pipeline's five architecture versions: what problem forced each change, what alternative was considered and rejected, and what the evaluation harness measured before and after. The companion diagram and quick-reference table are in the [main README](../README.md).
+This is the decision log behind the civ-rag-pipeline: what problem forced each change, what alternative was considered and rejected, and what the evaluation harness measured before and after. The companion diagram and quick-reference table are in the [main README](../README.md).
+
+**On the version numbers.** The "V1 → V5" labels are a retrospective narrative grouping, not commit tags — they were never named as versions while the work was happening. Checked against the actual commit history, the work falls into two phases rather than five evenly spaced releases: an **April baseline** (Apr 18–29: single-call extractor, single-section dense retrieval, reference-based eval, the Montezuma persona, and a Chroma→Pinecone migration) and a **June hardening sprint** (Jun 1–12: the RAG triad, multi-section parallel + hybrid retrieval, persona removal, the two-agent split, the ReAct agent with memory, and the eval rewire). The version labels map onto that real timeline like this: V1 ≈ April; V2 ≈ Jun 1; V3 ≈ Jun 2–5; V4 ≈ Jun 6; V5 ≈ Jun 12. They're kept as a navigational layer because the diagram and README table are built on them — but the dates and commit hashes in each entry below are the ground truth.
+
+**Mechanics vs. scores.** Everything about *how the code works* in the entries below is verified against the actual commit diffs. The eval *scores* (CR/G/AR numbers) come from recorded eval runs captured in development notes, not from the diffs, which contain code rather than results — so treat the mechanics as exact and the numbers as reported-from-notes.
 
 ![Architecture evolution V1 to V5](civ_rag_evolution.png)
 
@@ -23,7 +27,7 @@ This is the decision log behind the civ-rag-pipeline's five architecture version
 - [Persona: the Montezuma voice](#persona-the-montezuma-voice)
 - [Reference eval: faithfulness and relevance vs ideal answers](#reference-eval-faithfulness-and-relevance-vs-ideal-answers)
 - [2 chains: splitting parser and router](#2-chains-splitting-parser-and-router)
-- [Multi-section retrieval with hybrid search and RRF](#multi-section-retrieval-with-hybrid-search-and-rrf)
+- [Multi-section retrieval with hybrid search](#multi-section-retrieval-with-hybrid-search)
 - [RAG triad: context relevance, groundedness, answer relevance](#rag-triad-context-relevance-groundedness-answer-relevance)
 - [Persona removed: the controlled experiment](#persona-removed-the-controlled-experiment)
 - [Hardening the triad: eval set cleanup and the answer relevance fix](#hardening-the-triad-eval-set-cleanup-and-the-answer-relevance-fix)
@@ -36,79 +40,95 @@ This is the decision log behind the civ-rag-pipeline's five architecture version
 
 ## Extractor: one combined LLM call
 
-*(V1)*
+*(April baseline)*
 
-V1 used a single `version_extractor` chain that cleaned the query, extracted the target BBG version, and routed to a content section — all in one LLM call and one prompt. It was the fastest way to ship a working pipeline and prove the retrieval concept end to end before investing in a more elaborate parsing architecture.
+The pipeline started with a single `version_extractor` chain that cleaned the query, extracted the target BBG version, and routed to a content section — all in one LLM call and one prompt. It was the fastest way to ship a working pipeline and prove the retrieval concept end to end before investing in a more elaborate parsing architecture.
 
-**What it cost:** combining three responsibilities into one call meant a failure in one (e.g. section routing) was indistinguishable from a failure in another, and hard to diagnose. Missing few-shot examples caused two specific misroutes — see [reference eval](#reference-eval-faithfulness-and-relevance-vs-ideal-answers) below — which is what eventually motivated splitting the extractor into two chains in V2.
+**What it cost:** combining three responsibilities into one call meant a failure in one (e.g. section routing) was indistinguishable from a failure in another, and hard to diagnose. Missing few-shot examples caused two specific misroutes — see [reference eval](#reference-eval-faithfulness-and-relevance-vs-ideal-answers) below — which is what eventually motivated [splitting the extractor into two chains](#2-chains-splitting-parser-and-router).
 
 ## 1 section, dense only
 
-*(V1)*
+*(Apr 22 – Apr 28, 2026 — before the two-agent split. Verified against the actual commit diffs, not reconstructed from notes, so the dates and mechanics below are exact.)*
 
-Retrieval matched the query against a single inferred content section using dense embedding similarity only. When no section could be inferred, the pipeline fell back to an unfiltered search across all sections (excluding the 17,000-entry `names` section) at k=40.
+The retriever started simpler than even this heading implies, and evolved in three concrete steps while the single-call extractor was still in place — well before the bigger two-agent rewrite below.
 
-**What it cost:** multi-section questions — "which civilization has the Ice Hockey Rink?" needs both `improvements` and `leaders` — returned answers, but degraded ones, because the unfiltered fallback let large sections dominate the similarity ranking and bury the correct chunks. This was the single largest functional gap V2 addressed.
+**Apr 22 — `section_hint` added, three-branch priority logic.** The retriever gained a `section_hint` parameter alongside the existing `version` parameter. If `version` is given, filter to that version only — `section_hint` is ignored even if present. If `version` is absent but `section_hint` is given, filter to that section only. If neither is available, fall back to an unfiltered search excluding the `names` section (a 17k-document slice of pure lookup data that otherwise dominated the similarity ranking), with `k` bumped from 25 to 40 to compensate for the wider search space. Two of the three branches use the default k=25; only the worst case gets the wider k.
+
+**Apr 24 — version and section combine instead of one overriding the other.** A fourth branch was added: when both `version` and `section_hint` are present, they're combined with an `$and` filter instead of `version` silently discarding the section information. Before this fix, a query that correctly resolved to "version 7.3, asking about units" would search all of 7.3 unfiltered by section — a real, if short-lived, gap.
+
+**Apr 28 — Chroma to Pinecone, plus dedup and version pruning.** `Chroma` (local, file-backed) was swapped for `PineconeVectorStore` (hosted, reading the index name from an environment variable), the filter syntax moved to Pinecone's operators (`$in`, `$eq`), and the same commit deduplicated entries and pruned some BBG versions — which is also why the docstring's specific document counts ("~2,400 docs," "32k to ~1,980 docs for units") were trimmed out here: they'd gone stale.
+
+**What this didn't solve:** even with version and section combinable, the design could still only filter to *one* section string at a time. A query needing two sections simultaneously — "which civilization has the Ice Hockey Rink?" needs both `improvements` and `leaders` — had no way to express that. That gap, not the version/section logic above, is what motivated the move to list-based section routing and parallel retrieval next. See [multi-section retrieval](#multi-section-retrieval-with-hybrid-search).
 
 ## Persona: the Montezuma voice
 
-*(V1, V2)*
+*(April baseline → removed Jun 2)*
 
-Responses were generated in a Montezuma persona for tone and flavor.
+Responses were generated in a Montezuma persona for tone and flavor — the generation prompt opened with "You are Montezuma of the Aztec people and also an expert in the game of Civilization 6."
 
-**What it cost:** the persona encouraged the model to add color beyond what the retrieved chunks supported — fabricated version numbers and, in one case, a mod name that doesn't exist. This was confirmed, not assumed: removing the persona in V3 and re-running the eval, rather than guessing and rewriting the prompt, moved groundedness from 2.65 to 3.0 with a one-line change. See [persona removed](#persona-removed-the-controlled-experiment).
+**What it cost:** the persona encouraged the model to add color beyond what the retrieved chunks supported — fabricated version numbers and, in one case, a mod name that doesn't exist. See [persona removed](#persona-removed-the-controlled-experiment) for how this was confirmed and fixed.
 
 ## Reference eval: faithfulness and relevance vs ideal answers
 
-*(V1)*
+*(April baseline — `ae1796d`, Apr 25)*
 
-V1's eval scored generated responses against hand-written ideal answers on two metrics, Faithfulness and Relevance, using an LLM judge on a 1–3 scale across 18 questions. Baseline: Faithfulness 2.20, Relevance 2.30, with 5 complete retrieval failures (roughly a quarter of the set returning "I don't have information about that").
+The first eval scored generated responses against hand-written ideal answers on two metrics, Faithfulness and Relevance, in a single `judge_response` LLM call on a 1–3 scale across 18 questions. Baseline: Faithfulness 2.20, Relevance 2.30, with 5 complete retrieval failures (roughly a quarter of the set returning "I don't have information about that").
 
 Root cause was missing few-shot routing examples in the extractor prompt — questions about the Migration Treaty were misrouting to `misc`, and questions about BBG Expanded were misrouting to `changelog`. Adding targeted examples for both eliminated all five failures and moved Relevance to 2.89.
 
-**The limitation that motivated V2:** Faithfulness was framed as "does the answer stick to the source material," but mechanically it compared the response to the *ideal answer*, not the retrieved chunks — so it could score well even when the model was paraphrasing the ideal answer without being grounded in what was actually retrieved. A retrieval failure and a generation failure produced an identical low score, with no way to tell which stage to fix.
+**The limitation that motivated the triad:** Faithfulness was framed as "does the answer stick to the source material," but mechanically it compared the response to the *ideal answer*, not the retrieved chunks — so it could score well even when the model was paraphrasing the ideal answer without being grounded in what was actually retrieved. A retrieval failure and a generation failure produced an identical low score, with no way to tell which stage to fix. That blind spot is what the [RAG triad](#rag-triad-context-relevance-groundedness-answer-relevance) was built to remove.
 
 ## 2 chains: splitting parser and router
 
-*(V2, V3)*
+*(`efa6f96` — between Apr 29 and Jun 1; exact date not pinned)*
 
-The single extractor was split into two chains with separate responsibilities: a Query Parser that cleans the query and extracts the target version, and a Section Router that classifies which content section(s) the query targets — returning a *list*, not a single value, which is what made multi-section retrieval possible downstream.
+The single extractor was split into two chains with separate responsibilities: a Query Parser that cleans the query and extracts the target version, and a Section Router that classifies which content section(s) the query targets — returning a *list*, not a single value, which is what made multi-section retrieval possible downstream. This commit sits in the gap between the April baseline and the June sprint; its message ("split extractor into 2 different llm responsibilities") is clear but I don't have its precise date.
 
 **Rejected alternative:** keeping a single chain and just improving its prompt. Rejected because the underlying problem wasn't prompt quality — it was that two unrelated responsibilities shared one failure surface, where a routing fix could silently break version extraction and vice versa.
 
-## Multi-section retrieval with hybrid search and RRF
+## Multi-section retrieval with hybrid search
 
-*(V2, V3)*
+*(Jun 1 — `d3026e1` fan-out, `9cf1797` hybrid + BBG v7.5)*
 
-Two changes shipped together, bundled with a required full re-ingestion: a LangGraph supervisor that fans out to one retrieval call per routed section in parallel (using the `Send` API and a reducer to merge results), and hybrid BM25 sparse + dense retrieval, merged with Reciprocal Rank Fusion.
+This shipped in two commits on the same day, in this order:
 
-**Why hybrid:** dense embeddings can miss exact game terminology — "Eagle Warrior" or "Ancestral Hall" — when the embedding drifts toward a semantically related but wrong concept. BM25 catches exact terms; dense catches paraphrased or conceptual queries. They fail in opposite directions, so both run and get merged.
+**`d3026e1` (17:49) — parallel fan-out, still dense-only.** A LangGraph supervisor (`supervise_retrieval`) fans out one retrieval call per routed section using the `Send` API — verified in the diff: it returns a list of `Send("retriever", {...})`, one per section in `section_hints`, or a single `Send` with `current_section=None` when there are none. Each `retrieval` node returns `{"documents": result}` and LangGraph merges the parallel writes on the `RetrieverState.documents` field. At this commit retrieval was still `vector_store.similarity_search(...)` through the LangChain `PineconeVectorStore` wrapper — dense-only. *(One thing I have* not *witnessed: the exact reducer annotation on `RetrieverState.documents` in `schema.py`. The fan-out requires a list-merging reducer there, but `RetrieverState` has since been deleted, so confirm the annotation from git history before claiming it's `operator.add` specifically.)*
 
-**Why RRF over combining raw scores:** dense similarity scores (~0.87) and BM25 scores (~14.3) are on incompatible scales — averaging them is meaningless. RRF merges by rank position only (`score = 1/(k + rank)`, k=60), so the scale mismatch doesn't matter.
+**`9cf1797` (23:37) — hybrid BM25 + dense.** Later that night, `hybrid_query()` replaced `similarity_search`. This dropped the LangChain `PineconeVectorStore` wrapper for the raw `Pinecone` client and `index.query(...)`, sending both a dense `vector=` and a `sparse_vector=`. The fusion is **alpha-weighted, not RRF**: the dense vector is scaled by `ALPHA` and the sparse vector by `1 - ALPHA` (`ALPHA = 0.5`, equal weight), then handed to Pinecone's native sparse-dense hybrid query in a single call. There is no reciprocal-rank step and no rank constant anywhere in the code. The same commit ingested BBG v7.5 into a new index (`PINECONE_INDEX_NAME_V2`).
 
-**Why `dotproduct` over `cosine` on the Pinecone index:** cosine doesn't support hybrid sparse-dense search; the dense embeddings are L2-normalized by default, so dotproduct is mathematically equivalent to cosine on the dense side while also enabling sparse.
+**Why hybrid:** dense embeddings can miss exact game terminology — "Eagle Warrior" or "Ancestral Hall" — when the embedding drifts toward a semantically related but wrong concept. BM25 catches exact terms; dense catches paraphrased or conceptual queries. They fail in opposite directions, so both run and get combined.
+
+**Why the raw `index.query()` instead of the LangChain `PineconeVectorStore`:** the wrapper has no way to send a sparse vector — it only does dense `similarity_search`. Hybrid search requires passing `sparse_vector=` directly, which only the raw Pinecone client exposes. (This is the corrected reason; an earlier draft attributed the switch to per-call metadata filters, but `similarity_search` handled those fine via its `filter=` argument — the real driver was sparse support.)
+
+**Why alpha-weighting:** dense cosine-style scores and BM25 scores live on incompatible scales, so they can't simply be added. Scaling each by a weight that sums to 1 (`ALPHA` / `1 - ALPHA`) lets Pinecone's hybrid index combine them in a single retrieval, and `ALPHA` becomes a tunable dial between keyword precision and semantic recall. It was hardcoded to `0.5` here and pulled into config on Jun 6 (`6cd7252`).
+
+**The index metric:** Pinecone's sparse-dense hybrid search only runs on a `dotproduct` index — it's a platform requirement, not a choice made in this file. So the working `hybrid_query()` confirms the index uses `dotproduct`, even though the metric itself is set at index-creation time in the ingester, which isn't shown in these diffs.
 
 Measured impact: context relevance reached 2.94 — near-perfect, hybrid retrieval working as intended. See [RAG triad](#rag-triad-context-relevance-groundedness-answer-relevance) below for the full before/after.
 
 ## RAG triad: context relevance, groundedness, answer relevance
 
-*(V2)*
+*(Jun 1 — `d7ce7d5`)*
 
-V1's reference-based eval was replaced with three independent LLM-as-judge evaluators, run in parallel: Context Relevance (did retrieval surface the right chunks for this query?), Groundedness (is every claim in the response supported by those chunks?), and Answer Relevance (does the response address the question asked?). Groundedness specifically replaced Faithfulness, comparing against the *retrieved chunks* rather than an ideal answer — the fix for V1's blind spot.
+The reference-based eval was replaced with three independent LLM-as-judge evaluators, run in parallel via `asyncio.gather` (which is also when the eval runner's `main()` became async): Context Relevance (did retrieval surface the right chunks for this query?), Groundedness (is every claim in the response supported by those chunks?), and Answer Relevance (does the response address the question asked?). Groundedness specifically replaced Faithfulness, comparing against the *retrieved chunks* rather than an ideal answer — the fix for the April eval's blind spot.
+
+**A detail worth getting right:** at the triad's birth, Answer Relevance judged the response against the *query* — `answer_relevance_judge(query, response)` — not against an ideal answer. It only switched to reference-based four days later (Jun 5) as a deliberate fix; see [hardening the triad](#hardening-the-triad-eval-set-cleanup-and-the-answer-relevance-fix). So the triad was not "two chunk-based judges plus one reference-based judge" from the start — that asymmetry was introduced on purpose, in response to a specific failure, rather than designed in up front.
 
 Baseline scores (17 questions): CR 2.94 / G 2.65 / AR 2.88. High context relevance paired with low groundedness pointed directly at generation — specifically the persona — as the source of the remaining failures, rather than retrieval. That diagnostic precision is the entire value of the triad over a single blended score.
 
 ## Persona removed: the controlled experiment
 
-*(V3, V4, V5)*
+*(Jun 2 — `c64bc7f`, "Removed persona because of failing grounding eval scores")*
 
-The Montezuma persona was a *hypothesis* for the groundedness failures, not an assumed cause. Rather than rewriting the prompt speculatively, the persona was removed, the eval was re-run, and groundedness was compared directly: 2.65 → 3.0, from a one-line system prompt change. Two remaining groundedness failures were a source-data conflict (two document versions describing the same ability differently) and a cross-version fabrication issue — the latter a known architectural limitation, not something a prompt change can fix.
+The Montezuma persona was a *hypothesis* for the groundedness failures, not an assumed cause. Rather than rewriting the prompt speculatively, the persona was removed and the eval re-run. The change itself is exactly one line — the prompt's opening went from "You are Montezuma of the Aztec people and also an expert in the game of Civilization 6" to "You are an expert in the game of Civilization 6," nothing else touched. Per development notes, groundedness moved 2.65 → 3.0 (those numbers are from the eval run, not visible in the diff). Two remaining groundedness failures were a source-data conflict (two document versions describing the same ability differently) and a cross-version fabrication issue — the latter a known architectural limitation, not something a prompt change can fix.
+
+The takeaway for an interview: the discipline here isn't "removed the persona," it's "treated a prompt element as a hypothesis and used the eval as the test" — a one-line change, isolated and measured, rather than a speculative rewrite bundled with other edits.
 
 ## Hardening the triad: eval set cleanup and the answer relevance fix
 
-*(V3)*
+*(Jun 5 — `631fac8` "eval adjustments")*
 
-Two further fixes shipped alongside the persona removal. First, the Answer Relevance judge had no domain context and defaulted to real-world knowledge as its baseline — it penalized "Who is Alan Turing?" for not mentioning codebreaking, which is irrelevant in a Civ 6 context. Fix: switch that one judge to compare against an ideal answer instead of the bare query, and reword the question to scope it to game mechanics.
+Two fixes, several days after the persona removal. First, the Answer Relevance judge was switched from judging against the query to judging against an ideal answer — the literal change was `answer_relevance_judge(query, response)` becoming `answer_relevance_judge(ideal_answer, response)`, and the same commit un-commented the `ideal_answer` field back into the eval-file parser to feed it. The motivation: a query-only judge has no domain context and defaults to real-world knowledge as its baseline — it penalized "Who is Alan Turing?" for not mentioning codebreaking, which is irrelevant in a Civ 6 context. Rewording that question to scope it to game mechanics was part of the same cleanup.
 
 Second, the eval set itself had structural problems independent of the judges: questions with multiple valid answers (dropped), an ideal answer narrower than the game mechanic it described (reworded), and a genuine source-data discrepancy isolated by querying the vector store directly rather than assumed to be a generation error.
 
@@ -116,34 +136,36 @@ Final scores (15 cleaned questions): CR 3.0 / G 2.80 / AR 2.93.
 
 ## Parser only: router deleted for the ReAct agent
 
-*(V4, V5)*
+*(Jun 6 — `6ebb6551`)*
 
 The Section Router chain was deleted entirely. The remaining Query Parser still cleans the query and extracts the version, but section routing is now handled implicitly by the ReAct agent choosing which tools to call.
 
 ## ReAct agent with 6 tools and cross-session memory
 
-*(V4, V5)*
+*(Jun 6 — `6ebb6551`, "replace graph pipeline with ReAct agent in generate_response")*
 
-The deterministic LangGraph supervisor was replaced with a `create_react_agent` selecting from six typed tools, each wrapping the hybrid retrieval function with a section filter: units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all. The agent reasons at runtime from each tool's description rather than following a pre-classified route.
+The deterministic LangGraph supervisor was replaced with a `create_react_agent` selecting from six typed tools, each wrapping the hybrid retrieval function with a section filter: units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all. The agent reasons at runtime from each tool's description rather than following a pre-classified route. The diff is a clean swap: the old `graph.invoke(...)` call plus a hand-built `ChatPromptTemplate` and `cpt | llm | StrOutputParser()` generation step were all deleted and replaced with a single `agent.invoke(...)`.
+
+**Sequencing worth being precise about:** this landed *after* the triad (Jun 1) and *after* the persona removal (Jun 2) — the agentic rewrite was not the foundation the eval work was built on, it came on top of an already-measured, already-cleaned pipeline. That ordering matters in an interview, because it means the agent's quality could be compared against a known-good deterministic baseline rather than guessed at.
 
 **Rejected alternative:** keep improving the deterministic router's classification examples. Rejected because deterministic routing has a hard ceiling — it only handles query patterns someone thought to write an example for. An agent that reasons at runtime doesn't have that ceiling.
 
-**What it cost:** less predictability and a runaway-cost risk, bounded with a per-turn recursion limit, a per-tool retrieval cap, and a per-chunk content size limit.
+**What it cost:** less predictability and a runaway-cost risk, bounded with a per-turn recursion limit, a per-tool retrieval cap, and a per-chunk content size limit (the limits were pulled into config shortly after, in `6cd7252`).
 
-The agent's state management also made cross-session memory a small addition rather than a rewrite: a `MemorySaver` checkpointer keyed by `thread_id` persists conversation state across turns and sessions — a different memory mechanism, and a different scope, than the V2 supervisor's reducer, which only accumulated results *within* a single query.
+The agent's state management also made cross-session memory a small addition rather than a rewrite, and the diff confirms they arrived in the *same commit*: `generate_response` gained a `thread_id` parameter and a `RECURSION_LIMIT` config in exactly the change that introduced the agent. A `MemorySaver` checkpointer keyed by `thread_id` persists conversation state across turns and sessions — a different memory mechanism, and a different scope, than the supervisor's reducer, which only accumulated results *within* a single query.
 
 ## The eval breaks: what going agentic costs you
 
-*(V4)*
+*(Jun 6 → Jun 12 — broken by `6ebb6551`, fixed by `600f839`)*
 
-Going agentic broke the eval pipeline, and that's a deliberate inclusion in this log rather than a detail to gloss over. The ReAct agent consumes retrieved documents inside its own reasoning loop — they're never surfaced as a return value — so `generate_response` returned only a string, and the Context Relevance and Groundedness judges had nothing to score.
+Going agentic broke the eval pipeline, and that's a deliberate inclusion in this log rather than a detail to gloss over. The diff makes the mechanism exact: in the same Jun 6 commit that introduced the agent, `generate_response`'s return type went from `tuple[str, list[Document]]` down to just `str`. The ReAct agent consumes retrieved documents inside its own reasoning loop, so the documents were no longer a return value — and the Context Relevance and Groundedness judges, which take those documents as input, had nothing to score. For six days (Jun 6–12) the eval simply couldn't run.
 
-Re-measured scores on the V4 architecture once the eval was restored (see next entry): CR 3.0 / G 2.73 / AR 2.80 — close to V3, with the small dip expected since V3's gains included a carefully cleaned eval set and persona removal already baked in.
+Re-measured scores on this architecture once the eval was restored (see next entry): CR 3.0 / G 2.73 / AR 2.80 — close to the Jun 5 numbers, with the small dip expected since those gains included a carefully cleaned eval set and persona removal already baked in.
 
 ## Eval rewired: ToolMessage extraction plus structured logging
 
-*(V5)*
+*(Jun 12 — `600f839`, "eval pipeline fixed")*
 
-Two changes. First, the eval pipeline was rewired around `ToolMessage` objects in the agent's message history — they hold the exact string each tool returned, which is precisely what the LLM saw and the correct input for a groundedness check. `generate_response` now returns the response and those chunks as a tuple, and a fresh `thread_id` is generated per eval question to prevent memory bleeding across questions in the same eval run.
+Two changes. First, the eval pipeline was rewired around `ToolMessage` objects in the agent's message history. The fix pulls them out with `[m.content for m in result["messages"] if isinstance(m, ToolMessage)]` — those contents hold the exact string each tool returned, which is precisely what the LLM saw and the correct input for a groundedness check. Note the return type became `tuple[str, list[str]]`, not `list[Document]` as before the agent — tool outputs are already-formatted strings, so the judges were updated to consume strings. The same commit also generates a fresh `thread_id` per eval question (`str(uuid4())`) so the agent's cross-session memory doesn't bleed context from one eval question into the next and quietly inflate scores.
 
 Second, the ingester gained structured JSON logging (consistent fields per log line: batch number, size, sections, versions, status, error type) and per-batch error handling, so a single Pinecone timeout no longer kills the entire ingestion run. In production, those logs would ship to a log aggregator — filtering by `status=error` and grouping by `error_type` separates a data-quality problem (failures concentrated in one section) from a connectivity problem (failures scattered across batches).
