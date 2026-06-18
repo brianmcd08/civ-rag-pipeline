@@ -109,7 +109,7 @@ class UnifiedEntry:
             k: v
             for k, v in {
                 "section": self.section,
-                "bbg_version": [self.version],
+                "bbg_version": self.version,
                 "category": self.category,
                 "subcategory": self.subcategory,
                 "civilization": self.civilization,

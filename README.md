@@ -1,6 +1,6 @@
 # RAG Pipeline — Civilization 6 Domain
 
-A RAG-based chatbot that answers questions about the Better Game Balance (BBG) mod for Civilization VI. Ask it about unit stats, leader abilities, balance changes across versions, wonders, policies, and more — with full awareness of which BBG version introduced or changed something.
+A production-grade, agentic RAG system that answers questions about the Better Game Balance (BBG) mod for Civilization VI — unit stats, leader abilities, balance changes across versions, wonders, policies, and more — with full awareness of which BBG version introduced or changed something. The system has gone through five architecture iterations, from a single-call extractor to a ReAct agent with hybrid retrieval and cross-session memory, with every change measured against a RAG triad evaluation harness rather than judged by eye (see Architecture evolution below for the full decision history).
 
 🟢 **Live app:** [civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app](https://civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app/) *(password required)*
 
@@ -10,13 +10,46 @@ Live demo requires password due to API costs — screenshots at the bottom.
 
 ## How it works
 
-1. **Scraping** : BeautifulSoup scrapers pull data from the BBG patch notes pages across all supported versions (`v7.1` through `v7.5`, plus `base_game`), covering units, leaders, buildings, wonders, policies, great people, changelogs, and more.
-2. **Ingestion** : Scraped entries are embedded with OpenAI's `text-embedding-3-small` model (dense vectors) and encoded with a fitted BM25 encoder (sparse vectors). Both are upserted together into a Pinecone cloud vector database per record.
-3. **Query parsing** : At query time, a Claude-powered Query Parser cleans the user's question (fixing typos, removing explicit version references) and extracts the target BBG version. Version context is injected into the agent's input for use in tool calls.
-4. **Agentic retrieval** : A ReAct agent receives the cleaned query and reasons at runtime about which search tools to call. Six tools cover the main content sections (units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all). Each tool issues a hybrid query combining dense semantic search and BM25 sparse keyword search, with version and section metadata filters applied per call. The agent can call multiple tools in sequence when a question spans sections.
-5. **Generation** : The agent synthesizes retrieved results into a response grounded in the source data.
-6. **Memory** : Conversation state is persisted across turns via a `MemorySaver` checkpointer, enabling context-aware follow-up questions without re-stating the subject.
-7. **UI** : A Streamlit app serves the chatbot with per-session thread tracking, a sidebar with an About section and example questions.
+1. **Scraping**: BeautifulSoup scrapers pull data from the BBG patch notes pages across all supported versions (`v7.1` through `v7.5`, plus `base_game`), covering units, leaders, buildings, wonders, policies, great people, changelogs, and more.
+2. **Ingestion**: Scraped entries are embedded with OpenAI's `text-embedding-3-small` model (dense vectors) and encoded with a fitted BM25 encoder (sparse vectors). Both are upserted together into a Pinecone cloud vector database per record, in batches with structured JSON logging and per-batch error handling so a single failure doesn't kill the run.
+3. **Query parsing**: At query time, a Claude-powered Query Parser cleans the user's question (fixing typos, removing explicit version references) and extracts the target BBG version. Version context is injected into the agent's input for use in tool calls.
+4. **Agentic retrieval**: A ReAct agent receives the cleaned query and reasons at runtime about which search tools to call. Six tools cover the main content sections (units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all). Each tool issues a hybrid query combining dense semantic search and BM25 sparse keyword search, with version and section metadata filters applied per call, merged via Reciprocal Rank Fusion (RRF). The agent can call multiple tools in sequence when a question spans sections.
+5. **Generation**: The agent synthesizes retrieved results into a response grounded in the source data.
+6. **Memory**: Conversation state is persisted across turns via a `MemorySaver` checkpointer, enabling context-aware follow-up questions without re-stating the subject.
+7. **Evaluation**: Every architecture change is measured against a RAG triad eval harness — context relevance (did retrieval surface the right chunks?), groundedness (is the response supported by those chunks?), and answer relevance (does it answer the question?) — three parallel LLM-as-judge evaluators scored against a fixed question set.
+8. **UI**: A Streamlit app serves the chatbot with per-session thread tracking, a sidebar with an About section and example questions.
+
+---
+
+## Architecture evolution: V1 to V5
+
+The pipeline went through five distinct architectures. Each change was driven by a specific, measured failure in the version before it — not a rewrite for its own sake. The diagram tracks four pipeline stages across all five versions: gray means a stage carried over unchanged, blue means a deliberate architecture decision, and amber marks the one known regression (the eval breaking when the pipeline went agentic) before it was fixed in the next version.
+
+![Architecture evolution V1 to V5](docs/civ_rag_evolution.png)
+
+Click through any cell below for the full reasoning behind that decision — what problem it solved, what alternative was rejected, and what the eval measured before and after:
+
+| Version | Parse & route | Retrieve | Generate | Eval |
+|---|---|---|---|---|
+| **V1** | [Extractor — 1 LLM call](docs/architecture.md#extractor-one-combined-llm-call) | [1 section, dense only](docs/architecture.md#1-section-dense-only) | [Persona — Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [Reference eval](docs/architecture.md#reference-eval-faithfulness-and-relevance-vs-ideal-answers) |
+| **V2** | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid+RRF](docs/architecture.md#multi-section-retrieval-with-hybrid-search-and-rrf) | [Persona — Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [RAG triad](docs/architecture.md#rag-triad-context-relevance-groundedness-answer-relevance) |
+| **V3** | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid+RRF](docs/architecture.md#multi-section-retrieval-with-hybrid-search-and-rrf) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Triad hardened](docs/architecture.md#hardening-the-triad-eval-set-cleanup-and-the-answer-relevance-fix) |
+| **V4** | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools+memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval broken](docs/architecture.md#the-eval-breaks-what-going-agentic-costs-you) |
+| **V5** | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools+memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval rewired](docs/architecture.md#eval-rewired-toolmessage-extraction-plus-structured-logging) |
+
+**Eval scores across versions:**
+
+| Version | Eval approach | Questions | Scores |
+|---|---|---|---|
+| V1 | Reference-based (Faithfulness + Relevance vs ideal answers) | 18 | F 2.20 / R 2.30 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
+| V2 | RAG triad (CR / G / AR), parallel judges | 17 | CR 2.94 / G 2.65 / AR 2.88 |
+| V3 | RAG triad, hardened (AR switched to reference-based) | 15 | CR 3.0 / G 2.80 / AR 2.93 |
+| V4 | RAG triad | 15 | CR 3.0 / G 2.73 / AR 2.80 |
+| V5 | RAG triad, rewired for the agent | 15 | Same architecture as V4 — eval runner now works end-to-end |
+
+*V1's Faithfulness/Relevance scores aren't directly comparable to V2–V5's triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
+
+Full write-up — every rejected alternative and the eval delta behind each decision — lives in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -34,15 +67,16 @@ src/
 │   └── ingester.py     # Embeds scraped data, fits BM25 encoder, upserts into Pinecone
 ├── retrieval/
 │   ├── retriever.py        # hybrid_query — dense + sparse search via Pinecone
-│   └── version_extractor.py  # Query Parser: cleans query, extracts version
+│   └── query_parser.py     # Query Parser: cleans query, extracts version
 ├── agent/
-│   ├── tools.py            # Six search tools wrapping hybrid_query with section filters
-│   └── construct_agents.py # ReAct agent construction with MemorySaver checkpointer
-├── schema.py           # UnifiedEntry, ParsedQuery, RetrieverState
-├── config.py           # Version/Section enums, model names, retrieval constants
-├── utils.py            # format_docs helper
-└── secrets.py          # Reads from st.secrets (cloud) or .env (local)
-evaluation/             # RAG triad eval pipeline
+│   ├── tools.py             # Six search tools wrapping hybrid_query with section filters
+│   └── construct_agents.py  # ReAct agent construction with MemorySaver checkpointer
+├── schema.py             # UnifiedEntry, ParsedQuery
+├── config.py             # Version/Section enums, model names, retrieval constants
+├── logging_config.py     # Structlog configuration — shared logger for structured JSON output
+├── utils.py              # format_docs helper
+└── secrets.py            # Reads from st.secrets (cloud) or .env (local)
+evaluation/              # RAG triad eval pipeline
 ├── eval_runner.py              # Runs RAG triad eval across question set
 ├── schema.py                   # PartialJudgment and Judgment types
 ├── context_relevance_judge.py  # Did retrieval surface the right chunks?
