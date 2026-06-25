@@ -1,0 +1,41 @@
+# Secrets - never bake these into an image
+.env
+.envrc
+.streamlit/secrets.toml
+
+# Local virtual environment - rebuilt inside the container by uv sync
+.venv
+env/
+venv/
+ENV/
+
+# Python bytecode - regenerated inside the container
+__pycache__/
+*.py[codz]
+*$py.class
+
+# Local vector stores - large and not needed in the image
+.chroma
+.chroma/*
+chroma_langchain_db/
+
+# Git history - no reason to ship this, just bloat
+.git
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+.hypothesis/
+cover/
+
+# Linter/type checker caches
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+
+# Claude and Cursor config
+.claude/
+.cursorignore
+.cursorindexingignore

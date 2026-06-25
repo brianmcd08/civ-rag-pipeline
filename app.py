@@ -3,6 +3,7 @@ import uuid
 
 from src.response_generator import generate_response
 from src.config import HISTORY_LIMIT
+from src.secrets import get_secret
 
 st.title("Civilization 6 BBG Assistant")
 
@@ -15,7 +16,7 @@ def check_password():
     if not st.session_state.authenticated:
         password = st.text_input("Enter password to continue:", type="password")
         if password:
-            if password == st.secrets["APP_PASSWORD"]:
+            if password == get_secret("APP_PASSWORD"):
                 st.session_state.authenticated = True
                 st.rerun()
             else:
