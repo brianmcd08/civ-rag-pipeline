@@ -1,4 +1,8 @@
+import os
+import psycopg
+from psycopg.rows import dict_row
 from langchain.agents import create_agent
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.memory import MemorySaver
 from src.config import llm
 from src.agent.tools import (
@@ -10,7 +14,13 @@ from src.agent.tools import (
     search_units,
 )
 
-checkpointer = MemorySaver()
+db_uri = os.getenv("DATABASE_URL")
+if db_uri:
+    conn = psycopg.connect(db_uri, autocommit=True, row_factory=dict_row)  # pyright: ignore[reportArgumentType]
+    checkpointer = PostgresSaver(conn)  # pyright: ignore[reportArgumentType]
+    checkpointer.setup()
+else:
+    checkpointer = MemorySaver()
 
 tool_list = [
     search_buildings_and_improvements,
