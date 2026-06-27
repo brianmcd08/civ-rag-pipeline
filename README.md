@@ -15,8 +15,8 @@ Live demo requires password due to API costs — screenshots at the bottom.
 3. **Query parsing**: At query time, a Claude-powered Query Parser cleans the user's question (fixing typos, removing explicit version references) and extracts the target BBG version. Version context is injected into the agent's input for use in tool calls.
 4. **Agentic retrieval**: A ReAct agent receives the cleaned query and reasons at runtime about which search tools to call. Six tools cover the main content sections (units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all). Each tool issues a hybrid query combining dense semantic search and BM25 sparse keyword search — the dense and sparse vectors are alpha-weighted (`ALPHA = 0.5`) and combined in a single Pinecone hybrid query — with version and section metadata filters applied per call. The agent can call multiple tools in sequence when a question spans sections.
 5. **Generation**: The agent synthesizes retrieved results into a response grounded in the source data.
-6. **Memory**: Conversation state is persisted across turns via a `MemorySaver` checkpointer, enabling context-aware follow-up questions without re-stating the subject.
-7. **Evaluation**: Every architecture change is measured against a RAG triad eval harness — context relevance (is the retrieved context sufficient to fully answer the query?), groundedness (is the response supported by those chunks?), and answer relevance (does it answer the question?) — three parallel LLM-as-judge evaluators scored against a fixed question set.
+6. **Memory**: Conversation state is persisted across turns and container restarts via a `PostgresSaver` checkpointer backed by a Postgres database (Docker Compose). Each Streamlit session gets its own `thread_id` so context carries through a session; a new session starts fresh. (`thread_id` persistence across sessions via cookie or query param is the noted next step.)
+7. **Evaluation**: Every architecture change is measured against a RAG triad eval harness — context relevance (did retrieval surface the right chunks?), groundedness (is the response supported by those chunks?), and answer relevance (does it answer the question?) — three parallel LLM-as-judge evaluators scored against a fixed question set.
 8. **UI**: A Streamlit app serves the chatbot with per-session thread tracking, a sidebar with an About section and example questions.
 
 ---
@@ -49,6 +49,8 @@ Click through any cell below for the full reasoning behind that decision — wha
 
 *V1's Faithfulness/Relevance scores aren't directly comparable to V2–V5's triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
 
+**Post-V5 (Jun 25):** Memory layer upgraded from `MemorySaver` to `PostgresSaver` (Postgres-backed, survives container restarts, isolated per `thread_id`, inspectable via `SELECT * FROM checkpoints`); app containerized with Docker Compose. No pipeline stage changes — the four columns above are unchanged. See [Deployment](#deployment) below and the [architecture decision entry](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) for the full reasoning and limitations.
+
 Full write-up — every rejected alternative, the eval delta, and the commit behind each decision — lives in [`docs/architecture.md`](docs/architecture.md).
 
 ---
@@ -56,6 +58,8 @@ Full write-up — every rejected alternative, the eval delta, and the commit beh
 ## Project structure
 
 ```
+Dockerfile                  # Single-container image (uv, lockfile-first layer caching)
+docker-compose.yml          # Two services: app + db (postgres:16), named volume for persistence
 src/
 ├── scraping/           # One scraper per BBG data section
 │   ├── scrape_orchestrator.py  # Runs all scrapers
@@ -67,10 +71,10 @@ src/
 │   └── ingester.py     # Embeds scraped data, fits BM25 encoder, upserts into Pinecone
 ├── retrieval/
 │   ├── retriever.py        # hybrid_query — dense + sparse search via Pinecone
-│   └── query_parser.py     # Query Parser: cleans query, extracts version
+│   └── version_extractor.py  # Query Parser: cleans query, extracts version
 ├── agent/
 │   ├── tools.py             # Six search tools wrapping hybrid_query with section filters
-│   └── construct_agents.py  # ReAct agent construction with MemorySaver checkpointer
+│   └── construct_agents.py  # ReAct agent construction with PostgresSaver checkpointer (falls back to MemorySaver when DATABASE_URL is not set)
 ├── schema.py             # UnifiedEntry, ParsedQuery
 ├── config.py             # Version/Section enums, model names, retrieval constants
 ├── logging_config.py     # Structlog configuration — shared logger for structured JSON output
@@ -120,6 +124,31 @@ The ingester also re-fits the BM25 encoder on the full corpus and overwrites `mo
 
 ---
 
+## Deployment
+
+The app and its Postgres memory store run as two Docker Compose services:
+
+```bash
+# Requires Docker Desktop (or Docker Engine + Compose plugin)
+# Copy .env.example to .env and fill in keys before running
+docker compose up
+```
+
+The `app` service waits for the `db` healthcheck (`pg_isready`) to pass before starting. Conversation memory is written to a named Postgres volume (`pgdata`) and survives `docker compose restart` — it is only dropped with `docker compose down -v`.
+
+**Environment variables** (injected at runtime via `env_file: .env` — not baked into the image):
+
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude API (query parsing, generation, eval judges) |
+| `OPENAI_API_KEY` | Embedding model (`text-embedding-3-small`) |
+| `PINECONE_API_KEY` | Vector database |
+| `DATABASE_URL` | Postgres connection string — e.g. `postgresql://civ:civ@db:5432/civ` |
+
+Secrets are excluded from the image via `.dockerignore`. To run outside Docker (local dev without Postgres), omit `DATABASE_URL` and the app falls back to an in-memory `MemorySaver` checkpointer automatically.
+
+---
+
 ## Running tests
 
 ```bash
@@ -137,6 +166,7 @@ uv run pytest
 ## Limitations
 
 - **Base game reference data** (promotion trees, vanilla unit stats) is not included — the chatbot covers BBG balance changes only. For base game lookups, refer to the [Civilization Wiki](https://civilization.fandom.com/wiki/Civilization_VI).
+- **Session memory only**: each Streamlit session generates a fresh `thread_id`, so a returning user starts a new conversation rather than resuming a prior one. Persisting `thread_id` across sessions via cookie or query param is the noted next step.
 
 ---
 

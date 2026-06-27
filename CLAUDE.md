@@ -14,12 +14,12 @@ Python, LangGraph (create_react_agent), Pinecone hybrid search, Streamlit.
 - Run eval: `uv run python -m evaluation.eval_runner`
 - Lint: `uv run ruff check src/`
 
-## Architecture (v4)
+## Architecture (Post-V5 / current)
 - src/agent/tools.py — 6 typed retrieval tools (search_units, search_leaders, etc.)
-- src/agent/construct_agents.py — create_react_agent setup, MemorySaver checkpointer
+- src/agent/construct_agents.py — ReAct agent setup, PostgresSaver checkpointer (falls back to MemorySaver when DATABASE_URL is not set)
 - src/retrieval/retriever.py — hybrid_query() with BM25 + dense, direct Pinecone client
-- src/chains/query_parser.py — cleans query, extracts version (chain, not agent)
-- src/response_generator.py — calls agent, returns str (eval pipeline currently broken)
+- src/retrieval/version_extractor.py — cleans query, extracts version (chain, not agent)
+- src/response_generator.py — calls agent, returns tuple[str, list[str]] (response + ToolMessage strings)
 - evaluation/ — RAG triad judges (context relevance, groundedness, answer relevance)
 - models/bm25_values.json — fitted BM25 encoder, do not delete or refit
 
@@ -27,13 +27,11 @@ Python, LangGraph (create_react_agent), Pinecone hybrid search, Streamlit.
 - All hardcoded values live in config.py — never hardcode K, ALPHA, model names inline
 - format_docs() lives in src/utils.py — don't duplicate it
 - BM25Encoder loaded via two-step: BM25Encoder() then .load() — not constructor arg
-- section filter in hybrid_query uses {"section": {"$eq": value}}, not $in
+- Single-section tools use {"section": {"$eq": value}}; multi-section tools (techs_and_civics, buildings_and_improvements) use {"section": {"$in": [...]}}
 - search_general uses filter=None, not {"section": {"$eq": None}} — that's a Pinecone bug
 
-## Current V5 Work
-eval pipeline is broken — generate_response returns str, needs to return 
-tuple[str, list[str]] with ToolMessage content extracted from agent state.
-This is the active work item.
+## Current Status
+V5 is complete and the eval pipeline is working end-to-end. Post-V5 infra work (Jun 25) added PostgresSaver + Docker Compose — no pipeline stage changes. No active work items.
 
 ## What's Intentionally Not Here
 - Scraper details (rarely touched)
