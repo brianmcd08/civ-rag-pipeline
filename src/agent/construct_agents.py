@@ -32,9 +32,8 @@ tool_list = [
 ]
 
 prompt = """
-You are an expert in Civilization 6 BBG (Better Balance Game mod).
-Always use the available search tools to find information before answering.
-Do not use your own knowledge about Civilization.
+Always use the available search tools to find the answer to the query
+and only use that information.
 When the user specifies a version, pass it to the tools. When no version is
 specified, omit it.
 If asked when something was introduced or first appeared, search across
@@ -42,8 +41,6 @@ versions and identify the earliest bbg_version value in the results —
 that is the introduction version.
 If you cannot find a confident answer using the tools, say so. Do not
 make up information or use information outside of the tools.
-When generating your answer, use ONLY information returned by the tools.
-Do not supplement with your own knowledge even if the tool results seem incomplete.
 """
 
 agent = create_agent(
