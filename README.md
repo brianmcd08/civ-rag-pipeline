@@ -41,7 +41,7 @@ Click through any cell below for the full reasoning behind that decision — wha
 
 | Version | Eval approach | Questions | Scores |
 |---|---|---|---|
-| V1 | Reference-based (Faithfulness + Relevance vs ideal answers) | 18 | F 2.20 / R 2.30 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
+| V1 | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
 | V2 | RAG triad (CR / G / AR), parallel judges — AR judged vs the query | 17 | CR 2.94 / G 2.65 / AR 2.88 |
 | V3 | RAG triad, hardened (AR switched to vs ideal answer) | 15 | CR 3.0 / G 2.80 / AR 2.93 |
 | V4 | RAG triad | 15 | CR 3.0 / G 2.73 / AR 2.80 |
@@ -143,7 +143,9 @@ The `app` service waits for the `db` healthcheck (`pg_isready`) to pass before s
 | `ANTHROPIC_API_KEY` | Claude API (query parsing, generation, eval judges) |
 | `OPENAI_API_KEY` | Embedding model (`text-embedding-3-small`) |
 | `PINECONE_API_KEY` | Vector database |
+| `PINECONE_INDEX_NAME_V2` | Pinecone index name for the hybrid (dense + sparse) index |
 | `DATABASE_URL` | Postgres connection string — e.g. `postgresql://civ:civ@db:5432/civ` |
+| `APP_PASSWORD` | Password gate for the Streamlit UI |
 
 Secrets are excluded from the image via `.dockerignore`. To run outside Docker (local dev without Postgres), omit `DATABASE_URL` and the app falls back to an in-memory `MemorySaver` checkpointer automatically.
 
