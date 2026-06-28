@@ -6,7 +6,7 @@ from src.config import Version, llm
 from src.schema import ParsedQuery
 
 
-def query_parser(query: str, history: list) -> ParsedQuery:
+def query_parser(query: str, history: list[dict[str, str]]) -> ParsedQuery:
     """
     1) Extract version from query by passing Version to LLM
     2) Clean query by passing to LLM

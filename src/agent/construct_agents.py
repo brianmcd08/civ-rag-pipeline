@@ -16,9 +16,12 @@ from src.agent.tools import (
 
 db_uri = os.getenv("DATABASE_URL")
 if db_uri:
-    conn = psycopg.connect(db_uri, autocommit=True, row_factory=dict_row)  # pyright: ignore[reportArgumentType]
-    checkpointer = PostgresSaver(conn)  # pyright: ignore[reportArgumentType]
-    checkpointer.setup()
+    try:
+        conn = psycopg.connect(db_uri, autocommit=True, row_factory=dict_row)  # pyright: ignore[reportArgumentType]
+        checkpointer = PostgresSaver(conn)  # pyright: ignore[reportArgumentType]
+        checkpointer.setup()
+    except Exception:
+        checkpointer = MemorySaver()
 else:
     checkpointer = MemorySaver()
 
