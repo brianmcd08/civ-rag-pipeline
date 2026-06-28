@@ -23,33 +23,29 @@ Live demo requires password due to API costs — screenshots at the bottom.
 
 ## Architecture evolution
 
-Each change was driven by a specific, measured failure in the state before it — not a rewrite for its own sake. The "V1–V5" labels below are a retrospective narrative grouping rather than tagged releases: checked against the commit history, the work was really an **April baseline** (V1) and a focused **June 1–12 hardening sprint** (V2–V5). The diagram tracks four pipeline stages across those versions: gray means a stage carried over unchanged, blue means a deliberate architecture decision, and amber marks the one known regression (the eval breaking when the pipeline went agentic) before it was fixed in the next version.
+Each change was driven by a specific, measured failure in the state before it — not a rewrite for its own sake. The work fell into four phases: an **April baseline** (Foundation), a **June 1–5 hardening sprint** (Hardening), a **June 6–12 agentic experiment** (Agentic), and a **June 25 infra upgrade** (Ops). The diagram tracks five pipeline stages across those phases: gray means a stage carried over unchanged, blue means a deliberate architecture decision.
 
-![Architecture evolution V1 to V5](docs/civ_rag_evolution.png)
+![Architecture evolution](docs/civ_rag_evolution.png)
 
 Click through any cell below for the full reasoning behind that decision — what problem it solved, what alternative was rejected, what the eval measured, and the commit that shipped it. The mechanics in each entry are verified against the actual diffs:
 
-| Version | Parse & route | Retrieve | Generate | Eval |
-|---|---|---|---|---|
-| **V1** · Apr | [Extractor — 1 LLM call](docs/architecture.md#extractor-one-combined-llm-call) | [1 section, dense only](docs/architecture.md#1-section-dense-only) | [Persona — Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [Reference eval](docs/architecture.md#reference-eval-faithfulness-and-relevance-vs-ideal-answers) |
-| **V2** · Jun 1 | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid (α-weighted)](docs/architecture.md#multi-section-retrieval-with-hybrid-search) | [Persona — Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [RAG triad](docs/architecture.md#rag-triad-context-relevance-groundedness-answer-relevance) |
-| **V3** · Jun 2–5 | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid (α-weighted)](docs/architecture.md#multi-section-retrieval-with-hybrid-search) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Triad hardened](docs/architecture.md#hardening-the-triad-eval-set-cleanup-and-the-answer-relevance-fix) |
-| **V4** · Jun 6 | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools+memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval broken](docs/architecture.md#the-eval-breaks-what-going-agentic-costs-you) |
-| **V5** · Jun 12 | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools+memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval rewired](docs/architecture.md#eval-rewired-toolmessage-extraction-plus-structured-logging) |
+| Phase | Parse & route | Retrieve | Generate | Eval | Memory & deploy |
+|---|---|---|---|---|---|
+| **Foundation** · Apr | [Extractor — 1 LLM call](docs/architecture.md#extractor-one-combined-llm-call) | [1 section, dense only](docs/architecture.md#1-section-dense-only) | [Persona — Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [Reference eval](docs/architecture.md#reference-eval-faithfulness-and-relevance-vs-ideal-answers) | — |
+| **Hardening** · Jun 1–5 | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid (α-weighted)](docs/architecture.md#multi-section-retrieval-with-hybrid-search) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [RAG triad, hardened](docs/architecture.md#rag-triad-context-relevance-groundedness-answer-relevance) | — |
+| **Agentic** · Jun 6–12 | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools + memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval rewired](docs/architecture.md#eval-rewired-toolmessage-extraction-plus-structured-logging) | [MemorySaver](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) |
+| **Ops** · Jun 25 | ← same | ← same | ← same | ← same | [PostgresSaver + Docker Compose](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) |
 
-**Eval scores across versions** (mechanics are commit-verified; these score numbers are from recorded eval runs):
+**Eval scores by phase** (mechanics are commit-verified; score numbers are from recorded eval runs):
 
-| Version | Eval approach | Questions | Scores |
+| Phase | Eval approach | Questions | Scores |
 |---|---|---|---|
-| V1 | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
-| V2 | RAG triad (CR / G / AR), parallel judges — AR judged vs the query | 17 | CR 2.94 / G 2.65 / AR 2.88 |
-| V3 | RAG triad, hardened (AR switched to vs ideal answer) | 15 | CR 3.0 / G 2.80 / AR 2.93 |
-| V4 | RAG triad | 15 | CR 3.0 / G 2.73 / AR 2.80 |
-| V5 | RAG triad, rewired for the agent | 15 | Same architecture as V4 — eval runner now works end-to-end |
+| Foundation | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 → R 2.89 after routing fix; 5 → 0 retrieval failures |
+| Hardening | RAG triad (CR / G / AR), hardened — AR vs ideal answer | 15 | CR 3.0 / G 2.80 / AR 2.93 |
+| Agentic | RAG triad, rewired for agent (ToolMessage extraction) | 15 | CR 3.0 / G 2.73 / AR 2.80 |
+| Ops | No pipeline changes | — | — |
 
-*V1's Faithfulness/Relevance scores aren't directly comparable to V2–V5's triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
-
-**Post-V5 (Jun 25):** Memory layer upgraded from `MemorySaver` to `PostgresSaver` (Postgres-backed, survives container restarts, isolated per `thread_id`, inspectable via `SELECT * FROM checkpoints`); app containerized with Docker Compose. No pipeline stage changes — the four columns above are unchanged. See [Deployment](#deployment) below and the [architecture decision entry](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) for the full reasoning and limitations.
+*Foundation's Faithfulness/Relevance scores aren't directly comparable to the triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
 
 Full write-up — every rejected alternative, the eval delta, and the commit behind each decision — lives in [`docs/architecture.md`](docs/architecture.md).
 

@@ -2,7 +2,7 @@
 
 This is the decision log behind the civ-rag-pipeline: what problem forced each change, what alternative was considered and rejected, and what the evaluation harness measured before and after. The companion diagram and quick-reference table are in the [main README](../README.md).
 
-**On the version numbers.** The "V1 → V5" labels are a retrospective narrative grouping, not commit tags — they were never named as versions while the work was happening. Checked against the actual commit history, the work falls into two phases rather than five evenly spaced releases: an **April baseline** (Apr 18–29: single-call extractor, single-section dense retrieval, reference-based eval, the Montezuma persona, and a Chroma→Pinecone migration) and a **June hardening sprint** (Jun 1–12: the RAG triad, multi-section parallel + hybrid retrieval, persona removal, the two-agent split, the ReAct agent with memory, and the eval rewire). The version labels map onto that real timeline like this: V1 ≈ April; V2 ≈ Jun 1; V3 ≈ Jun 2–5; V4 ≈ Jun 6; V5 ≈ Jun 12. They're kept as a navigational layer because the diagram and README table are built on them — but the dates and commit hashes in each entry below are the ground truth. A **Jun 25 infra upgrade** — replacing `MemorySaver` with `PostgresSaver` and containerizing the app with Docker Compose — sits outside the V1–V5 narrative because it changed no pipeline stage; it's documented at the end of this file as a standalone entry.
+**On the phase labels.** Foundation, Hardening, Agentic, and Ops are retrospective narrative groupings, not commit tags — they were never named as phases while the work was happening. Checked against the actual commit history, the work falls into an **April baseline** (Foundation: Apr 18–29 — single-call extractor, single-section dense retrieval, reference-based eval, the Montezuma persona, and a Chroma→Pinecone migration), a **June 1–5 hardening sprint** (Hardening: the RAG triad, multi-section parallel + hybrid retrieval, persona removal, the two-chain split, and eval hardening), a **June 6–12 agentic experiment** (Agentic: the ReAct agent with memory, the eval breaking and being rewired, and structured logging), and a **June 25 infra upgrade** (Ops: replacing `MemorySaver` with `PostgresSaver` and containerizing the app with Docker Compose — no pipeline stage changes). The dates and commit hashes in each entry below are the ground truth.
 
 **Mechanics vs. scores.** Everything about *how the code works* in the entries below is verified against the actual commit diffs. The eval *scores* (CR/G/AR numbers) come from recorded eval runs captured in development notes, not from the diffs, which contain code rather than results — so treat the mechanics as exact and the numbers as reported-from-notes.
 
@@ -10,31 +10,37 @@ This is the decision log behind the civ-rag-pipeline: what problem forced each c
 
 **Eval scores across versions:**
 
-| Version | Eval approach | Questions | Scores |
+| Phase | Eval approach | Questions | Scores |
 |---|---|---|---|
-| V1 | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
-| V2 | RAG triad (CR / G / AR), parallel judges | 17 | CR 2.94 / G 2.65 / AR 2.88 |
-| V3 | RAG triad, hardened (AR switched to reference-based) | 15 | CR 3.0 / G 2.80 / AR 2.93 |
-| V4 | RAG triad | 15 | CR 3.0 / G 2.73 / AR 2.80 |
-| V5 | RAG triad, rewired for the agent | 15 | Same architecture as V4 — eval runner now works end-to-end |
+| Foundation | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
+| Hardening | RAG triad (CR / G / AR), hardened — AR vs ideal answer | 15 | CR 3.0 / G 2.80 / AR 2.93 |
+| Agentic | RAG triad, rewired for agent (ToolMessage extraction) | 15 | CR 3.0 / G 2.73 / AR 2.80 |
+| Ops | No pipeline changes | — | — |
 
-*V1's scores aren't directly comparable to V2–V5's — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
+*Foundation's scores aren't directly comparable to the triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
 
 ## Contents
 
+**Foundation (April)**
 - [Extractor: one combined LLM call](#extractor-one-combined-llm-call)
 - [1 section, dense only](#1-section-dense-only)
 - [Persona: the Montezuma voice](#persona-the-montezuma-voice)
 - [Reference eval: faithfulness and relevance vs ideal answers](#reference-eval-faithfulness-and-relevance-vs-ideal-answers)
+
+**Hardening (Jun 1–5)**
 - [2 chains: splitting parser and router](#2-chains-splitting-parser-and-router)
 - [Multi-section retrieval with hybrid search](#multi-section-retrieval-with-hybrid-search)
 - [RAG triad: context relevance, groundedness, answer relevance](#rag-triad-context-relevance-groundedness-answer-relevance)
 - [Persona removed: the controlled experiment](#persona-removed-the-controlled-experiment)
 - [Hardening the triad: eval set cleanup and the answer relevance fix](#hardening-the-triad-eval-set-cleanup-and-the-answer-relevance-fix)
+
+**Agentic (Jun 6–12)**
 - [Parser only: router deleted for the ReAct agent](#parser-only-router-deleted-for-the-react-agent)
 - [ReAct agent with 6 tools and cross-session memory](#react-agent-with-6-tools-and-cross-session-memory)
 - [The eval breaks: what going agentic costs you](#the-eval-breaks-what-going-agentic-costs-you)
 - [Eval rewired: ToolMessage extraction plus structured logging](#eval-rewired-toolmessage-extraction-plus-structured-logging)
+
+**Ops (Jun 25)**
 - [Persistent memory and containerization: PostgresSaver + Docker Compose](#persistent-memory-and-containerization-postgressaver--docker-compose)
 
 ---
