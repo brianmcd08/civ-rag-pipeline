@@ -7,6 +7,8 @@
     "python.analysis.indexing": true,
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.typeCheckingMode": "standard",
+    "basedpyright.analysis.diagnosticMode": "workspace",
+    "basedpyright.analysis.typeCheckingMode": "standard",
     "terminal.integrated.env.linux": {
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"

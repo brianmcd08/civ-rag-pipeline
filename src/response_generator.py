@@ -30,7 +30,9 @@ def generate_response(query: str, history: list, thread_id: str) -> tuple[str, l
     except GraphRecursionError:
         return NO_ANSWER_MESSAGE, []
 
-    response = result["messages"][-1].content
-    documents = [m.content for m in result["messages"] if isinstance(m, ToolMessage)]
+    response = result["messages"][-1].text
+    documents: list[str] = [
+        m.text for m in result["messages"] if isinstance(m, ToolMessage)
+    ]
 
     return response, documents
