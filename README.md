@@ -177,7 +177,18 @@ uv run pytest
 
 ## Screenshots
 
-<img width="1085" height="868" alt="Screenshot_2026-05-23_15-37-06" src="https://github.com/user-attachments/assets/d40e23b9-1152-4552-a3f3-6884cdfa25bf" />
-<img width="1085" height="868" alt="Screenshot_2026-05-23_15-38-05" src="https://github.com/user-attachments/assets/1e0ae9ae-d229-46f5-afbb-e2f9fe214490" />
-<img width="1085" height="868" alt="Screenshot_2026-05-23_15-39-37" src="https://github.com/user-attachments/assets/27dca6db-9405-4bc0-962a-8b8a7d56fa40" />
-<img width="1085" height="868" alt="Screenshot_2026-05-23_15-40-46" src="https://github.com/user-attachments/assets/8bb8a639-531c-45cf-841d-080c7bf1fe0a" />
+**Version-specific retrieval** — unit stats pulled from the v7.5 corpus:
+
+<img alt="Warak'aq stats retrieved for version 7.5" src="docs/grounded_answer.png" />
+
+**Multi-section retrieval** — one question spanning the leaders and improvements sections:
+
+<img alt="Egypt's leaders and unique improvement answered in one query" src="docs/memory_a.png" />
+
+**Conversation memory** — the follow-up resolves "her" from the previous turn:
+
+<img alt="Follow-up question resolving 'her unique unit' via conversation memory" src="docs/memory_b.png" />
+
+**Grounded over prior** — the Warrior's cost is 20 in this corpus (vanilla says 40); the answer comes from the retrieved chunks, not training data:
+
+<img alt="Eagle Warrior identified correctly and Warrior cost answered from the corpus" src="docs/eagle_warrior.png" />
