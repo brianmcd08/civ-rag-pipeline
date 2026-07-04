@@ -16,6 +16,7 @@ This is the decision log behind the civ-rag-pipeline: what problem forced each c
 | Hardening | RAG triad (CR / G / AR), hardened — AR vs ideal answer | 15 | CR 3.0 / G 2.80 / AR 2.93 |
 | Agentic | RAG triad, rewired for agent (ToolMessage extraction) | 15 | CR 3.0 / G 2.73 / AR 2.80 |
 | Ops | No pipeline changes | — | — |
+| Model swap | RAG triad, same harness; Sonnet 4.6 as agent model | 15 | CR 3.00 / G 2.93 / AR 2.93 |
 
 *Foundation's scores aren't directly comparable to the triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
 
@@ -42,6 +43,9 @@ This is the decision log behind the civ-rag-pipeline: what problem forced each c
 
 **Ops (Jun 25)**
 - [Persistent memory and containerization: PostgresSaver + Docker Compose](#persistent-memory-and-containerization-postgressaver--docker-compose)
+
+**Model swap (Jul 4)**
+- [Prior-override investigation: the measured model swap](#prior-override-investigation-the-measured-model-swap)
 
 ---
 
@@ -169,7 +173,7 @@ Going agentic broke the eval pipeline, and that's a deliberate inclusion in this
 
 Re-measured scores on this architecture once the eval was restored (see next entry): CR 3.0 / G 2.73 / AR 2.80 — close to the Jun 5 numbers, with the small dip expected since those gains included a carefully cleaned eval set and persona removal already baked in.
 
-**Interactive testing surfaced a failure mode the scores understate.** In live use, the agent frequently substitutes Civ 5 training data for retrieved Civ 6 content without any signal of uncertainty — a confident wrong answer. Canonical example: ask for the Aztec unique unit in BBG 7.5; the agent returns "Jaguar" (the Civ 5 Aztec unique unit). The retrieved chunk containing "Eagle Warrior" is present in the tool outputs — retrieval is not the failure. A single "Are you sure?" follow-up is enough: the agent re-reads the same retrieved chunk and self-corrects to "Eagle Warrior." The mechanism is not a retrieval gap; it is a generation failure rooted in the architecture. From the model's perspective, retrieved tokens and training tokens are indistinguishable in the context window — a confident training prior wins when the prior is strong. Prompt instructions telling the model to prefer retrieved content fight that prior but cannot reliably override it. The deterministic pipeline did not share this failure mode: chunks went directly into a constrained generation call and the model only ever saw the retrieved content, with no competing reasoning path where training knowledge could surface. This finding, not the groundedness delta alone, is the primary rationale for the revert decision. Preserved as a deliberate talking point.
+**Interactive testing surfaced a failure mode the scores understate.** In live use, the agent frequently substitutes Civ 5 training data for retrieved Civ 6 content without any signal of uncertainty — a confident wrong answer. Canonical example: ask for the Aztec unique unit in BBG 7.5; the agent returns "Jaguar" (the Civ 5 Aztec unique unit). The retrieved chunk containing "Eagle Warrior" is present in the tool outputs — retrieval is not the failure. A single "Are you sure?" follow-up is enough: the agent re-reads the same retrieved chunk and self-corrects to "Eagle Warrior." The mechanism is not a retrieval gap; it is a generation failure rooted in the architecture. From the model's perspective, retrieved tokens and training tokens are indistinguishable in the context window — a confident training prior wins when the prior is strong. Prompt instructions telling the model to prefer retrieved content fight that prior but cannot reliably override it. The deterministic pipeline did not share this failure mode: chunks went directly into a constrained generation call and the model only ever saw the retrieved content, with no competing reasoning path where training knowledge could surface. This finding, not the groundedness delta alone, drove the decision-making that followed: initially a revert decision, later overturned by measurement (see "Prior-override investigation: the measured model swap" below).
 
 ## Eval rewired: ToolMessage extraction plus structured logging
 
@@ -200,3 +204,23 @@ With the pipeline stages stable at V5, the next gap was operational: `MemorySave
 **What it does not give yet.** True cross-session persistence for a returning user. `thread_id` is still generated fresh per Streamlit session (`str(uuid4())` in `app.py`), so a returning user gets a blank slate even though their prior conversation exists in Postgres. Fixing that requires persisting the `thread_id` to a cookie or query param — it's the noted next step, not an oversight.
 
 **Rejected alternative.** Keep `MemorySaver` and accept the restart-wipe behavior. Rejected because it's a defensibility gap: any reviewer who asks "what happens to conversation state when you redeploy?" gets a weak answer. PostgresSaver closes that gap cleanly and the Docker Compose work was already happening to containerize the app anyway.
+
+## Prior-override investigation: the measured model swap
+
+*(Jul 4 — probe scripts in `evaluation/`; Haiku eval baseline preserved in `evaluation/judgment_haiku_agentic_baseline.csv`)*
+
+The training-data override documented above ("The eval breaks") initially drove a revert decision: the deterministic pipeline removes the reasoning loop where a training prior can beat a retrieved chunk, and that guarantee is model-independent. Before shipping the revert, the counter-hypothesis (is this failure just model capability?) was tested properly. The result overturned the decision.
+
+**Ruling out prompting.** The canonical probe (`evaluation/prior_override_probe.py`: fresh thread, "What is the Aztec unique unit in version 7.5?", then "Are you sure?") measured Haiku wrong in 9 of 10 fresh sessions on the shipped prompt. Anchoring the system prompt with "every question is about Civilization 6 BBG, never any other game" made it 10 of 10 wrong. The challenge recovered the correct answer in every session. Prompting is ruled out by measurement, not by exhaustion.
+
+**The probe trap.** Sonnet 4.6 passes the canonical probe 10 of 10, and by itself that proves nothing: Eagle Warrior is also the vanilla Civ 6 answer, so a correct answer can be prior agreement rather than grounding. This is the same blind spot that motivated the RAG triad (see "The limitation that motivated the triad" above), reappearing in probe design. On a public corpus, grounding and prior knowledge overlap; a discriminating probe must use facts where the corpus disagrees with training data.
+
+**The discriminating probe.** BBG stat values diverge from vanilla (Warrior production cost 20 vs 40; Scout 15 vs 30; Eagle Warrior 32 vs 65; Knight melee strength 50 vs 48). Raw Sonnet with no retrieval answers from its prior, 12 of 12, wrong for this corpus. Through the pipeline, 12 of 12 grounded. Pipeline Haiku also grounds those stats 12 of 12; raw Haiku produces no corpus values (`evaluation/divergent_probe.py`, `evaluation/anchor_probe.py`).
+
+**Refined mechanism.** Prior-vs-context arbitration is capability-dependent and prior-strength-dependent. Haiku grounds facts where its prior is weak and loses only where its prior is confidently wrong (the Jaguar case), regardless of prompting. Sonnet overrides even its own confidently wrong priors.
+
+**The eval.** Full RAG triad with Sonnet as the agent model: CR 3.00 / G 2.93 / AR 2.93, versus 3.00 / 2.73 / 2.80 on Haiku agentic and 3.0 / 2.80 / 2.93 on the Hardening deterministic baseline. Groundedness on the agentic build now exceeds the deterministic baseline.
+
+**Rejected alternative: the revert itself.** It was the right call on the earlier data and was documented as such; it was superseded when the measurements above landed. It remains the architecture to A/B first under cost constraints or for correctness-critical deployments, because it earns groundedness structurally (constrained generation, no contest) instead of paying for capability.
+
+**What it cost:** 3x per token (Sonnet 4.6 at $3/$15 per million tokens in/out, versus Haiku 4.5 at $1/$5).
