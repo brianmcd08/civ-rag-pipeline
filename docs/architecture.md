@@ -2,7 +2,7 @@
 
 This is the decision log behind the civ-rag-pipeline: what problem forced each change, what alternative was considered and rejected, and what the evaluation harness measured before and after. The companion diagram and quick-reference table are in the [main README](../README.md).
 
-**On the phase labels.** Foundation, Hardening, Agentic, and Ops are retrospective narrative groupings, not commit tags — they were never named as phases while the work was happening. Checked against the actual commit history, the work falls into an **April baseline** (Foundation: Apr 18–29 — single-call extractor, single-section dense retrieval, reference-based eval, the Montezuma persona, and a Chroma→Pinecone migration), a **June 1–5 hardening sprint** (Hardening: the RAG triad, multi-section parallel + hybrid retrieval, persona removal, the two-chain split, and eval hardening), a **June 6–12 agentic experiment** (Agentic: the ReAct agent with memory, the eval breaking and being rewired, and structured logging), and a **June 25 infra upgrade** (Ops: replacing `MemorySaver` with `PostgresSaver` and containerizing the app with Docker Compose — no pipeline stage changes). The dates and commit hashes in each entry below are the ground truth.
+**On the phase labels.** Foundation, Hardening, Agentic, and Ops are retrospective narrative groupings, not commit tags — they were never named as phases while the work was happening. Checked against the actual commit history, the work falls into an **April baseline** (Foundation: Apr 18–29 — single-call extractor, single-section dense retrieval, reference-based eval, the Montezuma persona, and a Chroma→Pinecone migration), a **June 1–5 hardening sprint** (Hardening: the RAG triad, multi-section parallel + hybrid retrieval, persona removal, the two-chain split, and eval hardening), a **June 6–12 agentic experiment** (Agentic: the ReAct agent with memory, the eval breaking and being rewired, and structured logging), and a **June 25 – July 4 operations phase** (Ops: replacing `MemorySaver` with `PostgresSaver` and containerizing the app with Docker Compose — no pipeline stage changes — then a July 4 measured model swap to Sonnet 4.6). The dates and commit hashes in each entry below are the ground truth.
 
 **Mechanics vs. scores.** Everything about *how the code works* in the entries below is verified against the actual commit diffs. The eval *scores* (CR/G/AR numbers) come from recorded eval runs captured in development notes, not from the diffs, which contain code rather than results — so treat the mechanics as exact and the numbers as reported-from-notes.
 
@@ -15,8 +15,7 @@ This is the decision log behind the civ-rag-pipeline: what problem forced each c
 | Foundation | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
 | Hardening | RAG triad (CR / G / AR), hardened — AR vs ideal answer | 15 | CR 3.0 / G 2.80 / AR 2.93 |
 | Agentic | RAG triad, rewired for agent (ToolMessage extraction) | 15 | CR 3.0 / G 2.73 / AR 2.80 |
-| Ops | No pipeline changes | — | — |
-| Model swap | RAG triad, same harness; Sonnet 4.6 as agent model | 15 | CR 3.00 / G 2.93 / AR 2.93 |
+| Ops | RAG triad, same harness; Jul 4 model swap to Sonnet 4.6 | 15 | CR 3.00 / G 2.93 / AR 2.93 |
 
 *Foundation's scores aren't directly comparable to the triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
 
@@ -41,10 +40,8 @@ This is the decision log behind the civ-rag-pipeline: what problem forced each c
 - [The eval breaks: what going agentic costs you](#the-eval-breaks-what-going-agentic-costs-you)
 - [Eval rewired: ToolMessage extraction plus structured logging](#eval-rewired-toolmessage-extraction-plus-structured-logging)
 
-**Ops (Jun 25)**
+**Ops (Jun 25 – Jul 4)**
 - [Persistent memory and containerization: PostgresSaver + Docker Compose](#persistent-memory-and-containerization-postgressaver--docker-compose)
-
-**Model swap (Jul 4)**
 - [Prior-override investigation: the measured model swap](#prior-override-investigation-the-measured-model-swap)
 
 ---

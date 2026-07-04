@@ -23,7 +23,7 @@ Live demo requires password due to API costs — screenshots at the bottom.
 
 ## Architecture evolution
 
-Each change was driven by a specific, measured failure in the state before it — not a rewrite for its own sake. The work fell into four phases: an **April baseline** (Foundation), a **June 1–5 hardening sprint** (Hardening), a **June 6–12 agentic experiment** (Agentic), and a **June 25 infra upgrade** (Ops). The diagram tracks five pipeline stages across those phases: gray means a stage carried over unchanged, blue means a deliberate architecture decision.
+Each change was driven by a specific, measured failure in the state before it — not a rewrite for its own sake. The work fell into four phases: an **April baseline** (Foundation), a **June 1–5 hardening sprint** (Hardening), a **June 6–12 agentic experiment** (Agentic), and a **June 25 – July 4 operations phase** (Ops: containerization and persistent memory, then a measured model swap). The diagram tracks five pipeline stages across those phases: gray means a stage carried over unchanged, blue means a deliberate architecture decision.
 
 ![Architecture evolution](docs/civ_rag_evolution.png)
 
@@ -34,7 +34,7 @@ Click through any cell below for the full reasoning behind that decision — wha
 | **Foundation** · Apr | [Extractor — 1 LLM call](docs/architecture.md#extractor-one-combined-llm-call) | [1 section, dense only](docs/architecture.md#1-section-dense-only) | [Persona — Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [Reference eval](docs/architecture.md#reference-eval-faithfulness-and-relevance-vs-ideal-answers) | — |
 | **Hardening** · Jun 1–5 | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid (α-weighted)](docs/architecture.md#multi-section-retrieval-with-hybrid-search) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [RAG triad, hardened](docs/architecture.md#rag-triad-context-relevance-groundedness-answer-relevance) | — |
 | **Agentic** · Jun 6–12 | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools + memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval rewired](docs/architecture.md#eval-rewired-toolmessage-extraction-plus-structured-logging) | [MemorySaver](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) |
-| **Ops** · Jun 25 | ← same | ← same | ← same | ← same | [PostgresSaver + Docker Compose](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) |
+| **Ops** · Jun 25 – Jul 4 | ← same | ← same | [Sonnet 4.6 — measured swap](docs/architecture.md#prior-override-investigation-the-measured-model-swap) | ← same | [PostgresSaver + Docker Compose](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) |
 
 **Eval scores by phase** (mechanics are commit-verified; score numbers are from recorded eval runs):
 
@@ -43,8 +43,7 @@ Click through any cell below for the full reasoning behind that decision — wha
 | Foundation | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 → R 2.89 after routing fix; 5 → 0 retrieval failures |
 | Hardening | RAG triad (CR / G / AR), hardened — AR vs ideal answer | 15 | CR 3.0 / G 2.80 / AR 2.93 |
 | Agentic | RAG triad, rewired for agent (ToolMessage extraction) | 15 | CR 3.0 / G 2.73 / AR 2.80 |
-| Ops | No pipeline changes | — | — |
-| Model swap · Jul 4 | RAG triad, same harness; Sonnet 4.6 as agent model | 15 | CR 3.00 / G 2.93 / AR 2.93 |
+| Ops | RAG triad, same harness; Jul 4 model swap to Sonnet 4.6 | 15 | CR 3.00 / G 2.93 / AR 2.93 |
 
 *Foundation's Faithfulness/Relevance scores aren't directly comparable to the triad scores — they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
 
