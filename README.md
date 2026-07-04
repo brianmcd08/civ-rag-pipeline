@@ -51,6 +51,18 @@ Full write-up — every rejected alternative, the eval delta, and the commit beh
 
 ---
 
+## Known failure mode: training data vs. retrieved context
+
+The most instructive finding in this project came from interactive testing, not the eval scores. Ask the agent for the Aztec unique unit in BBG 7.5 and it confidently answers "Jaguar," which is the Civ 5 Aztec unit; it does not exist anywhere in this corpus. Measured across 10 fresh sessions, 9 answered with some form of "Jaguar"; the one session that answered correctly also held its answer when challenged. Retrieval is not the failure: the chunk containing "Eagle Warrior" (the correct answer) is present in the tool output the model just read. Reply "Are you sure?" and the agent re-reads the same chunk it already had and corrects itself.
+
+<!-- SCREENSHOT: Jaguar wrong answer -> "Are you sure?" -> Eagle Warrior self-correction (capture on the agentic build) -->
+
+The root cause is architectural, not a prompting problem. Inside the context window, retrieved tokens and training tokens are indistinguishable to the model; when a training prior is strong (Civ 5 content is heavily represented in training data, BBG 7.5 barely at all), the prior can win over the retrieved content, with no signal of uncertainty. Prompt instructions to "prefer retrieved content" fight that prior but cannot reliably override it. The earlier deterministic pipeline does not share this failure mode: retrieved chunks feed a constrained generation call, so there is no free reasoning loop where training knowledge can surface.
+
+This finding, more than the groundedness delta in the table above (2.80 to 2.73), is why the deterministic architecture is the one I would ship for a correctness-critical use case. The agentic build stays deployed here deliberately, so the failure mode remains reproducible rather than described secondhand.
+
+---
+
 ## Project structure
 
 ```
