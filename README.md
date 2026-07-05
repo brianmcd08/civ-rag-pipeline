@@ -23,7 +23,7 @@ Live demo requires password due to API costs — screenshots at the bottom.
 
 ## Architecture evolution
 
-Each change was driven by a specific, measured failure in the state before it — not a rewrite for its own sake. The work fell into four phases: an **April baseline** (Foundation), a **June 1–5 hardening sprint** (Hardening), a **June 6–12 agentic experiment** (Agentic), and a **June 25 – July 4 operations phase** (Ops: containerization and persistent memory, then a measured model swap). The diagram tracks five pipeline stages across those phases: gray means a stage carried over unchanged, blue means a deliberate architecture decision.
+Each change was driven by a specific, measured failure in the state before it — not a rewrite for its own sake. The work fell into four phases: an **April baseline** (Foundation), a **June 1–5 hardening sprint** (Hardening), a **June 6–13 agentic experiment** (Agentic), and a **June 25 – July 4 operations phase** (Ops: containerization and persistent memory, then a measured model swap). The diagram tracks five pipeline stages across those phases: gray means a stage carried over unchanged, blue means a deliberate architecture decision.
 
 ![Architecture evolution](docs/civ_rag_evolution.png)
 
@@ -33,7 +33,7 @@ Click through any cell below for the full reasoning behind that decision — wha
 |---|---|---|---|---|---|
 | **Foundation** · Apr | [Extractor — 1 LLM call](docs/architecture.md#extractor-one-combined-llm-call) | [1 section, dense only](docs/architecture.md#1-section-dense-only) | [Persona — Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [Reference eval](docs/architecture.md#reference-eval-faithfulness-and-relevance-vs-ideal-answers) | — |
 | **Hardening** · Jun 1–5 | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid (α-weighted)](docs/architecture.md#multi-section-retrieval-with-hybrid-search) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [RAG triad, hardened](docs/architecture.md#rag-triad-context-relevance-groundedness-answer-relevance) | — |
-| **Agentic** · Jun 6–12 | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools + memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval rewired](docs/architecture.md#eval-rewired-toolmessage-extraction-plus-structured-logging) | [MemorySaver](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) |
+| **Agentic** · Jun 6–13 | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools + memory](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval rewired](docs/architecture.md#eval-rewired-toolmessage-extraction-plus-structured-logging) | [MemorySaver](docs/architecture.md#react-agent-with-6-tools-and-cross-session-memory) |
 | **Ops** · Jun 25 – Jul 4 | ← same | ← same | [Sonnet 4.6 — measured swap](docs/architecture.md#prior-override-investigation-the-measured-model-swap) | ← same | [PostgresSaver + Docker Compose](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) |
 
 **Eval scores by phase** (mechanics are commit-verified; score numbers are from recorded eval runs):
@@ -81,7 +81,8 @@ src/
 ├── config.py             # Version/Section enums, model names, retrieval constants
 ├── logging_config.py     # Structlog configuration — shared logger for structured JSON output
 ├── utils.py              # format_docs helper
-└── secrets.py            # Reads from st.secrets (cloud) or .env (local)
+├── secrets.py            # Reads from st.secrets (cloud) or .env (local)
+└── response_generator.py # Pipeline entry point — query parsing + agent invocation
 evaluation/              # RAG triad eval pipeline
 ├── eval_runner.py              # Runs RAG triad eval across question set
 ├── schema.py                   # PartialJudgment and Judgment types
@@ -90,7 +91,6 @@ evaluation/              # RAG triad eval pipeline
 └── answer_relevance.py         # Does the response answer the question?
 models/
 └── bm25_values.json    # Fitted BM25 encoder — generated at ingestion time
-response_generator.py   # Pipeline entry point — query parsing + agent invocation
 app.py                  # Streamlit UI
 ```
 
@@ -138,7 +138,7 @@ docker compose up
 
 The `app` service waits for the `db` healthcheck (`pg_isready`) to pass before starting. Conversation memory is written to a named Postgres volume (`pgdata`) and survives `docker compose restart` — it is only dropped with `docker compose down -v`.
 
-**Environment variables** (injected at runtime via `env_file: .env` — not baked into the image):
+**Environment variables** (injected at runtime, never baked into the image — API keys via `env_file: .env`, `DATABASE_URL` set in the Compose `environment:` block for the local stack):
 
 | Variable | Purpose |
 |---|---|

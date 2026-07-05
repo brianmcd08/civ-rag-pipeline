@@ -30,7 +30,7 @@ COLUMNS = ["Parse & route", "Retrieve", "Generate", "Eval", "Memory & deploy"]
 ROWS = [
     ("Foundation", "Apr"),
     ("Hardening", "Jun 1–5"),
-    ("Agentic", "Jun 6–12"),
+    ("Agentic", "Jun 6–13"),
     ("Ops", "Jun 25 – Jul 4"),
 ]
 
@@ -68,7 +68,7 @@ CELLS = [
 
 FOOTNOTE = (
     "Dates are commit dates.  Foundation is the April baseline.  "
-    "Hardening and Agentic shipped in a Jun 1–12 sprint.  "
+    "Hardening and Agentic shipped in a Jun 1–13 sprint.  "
     "Ops: Jun 25 infra upgrade, then the Jul 4 measured model swap."
 )
 
