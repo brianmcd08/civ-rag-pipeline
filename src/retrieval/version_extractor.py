@@ -33,7 +33,7 @@ def query_parser(query: str, history: list[dict[str, str]]) -> ParsedQuery:
     - "latest version", "most recent version", "current version" should be treated as {latest_version}.
     - If the query is asking WHICH versions something appears in, or spans
         all versions (e.g. "which versions is X in?", "has X changed across versions?",
-        "when was X added?"), set version to null instead of defaulting to v74.
+        "when was X added?"), set version to null instead of defaulting to {latest_version}.
 
     2) CLEANED QUERY
     Fix typos and remove explicit version references (e.g. "in v74", "in version 6.5")
