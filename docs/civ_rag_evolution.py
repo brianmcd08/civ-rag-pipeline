@@ -62,7 +62,7 @@ CELLS = [
         ("ReAct agent", "Same as Agentic", False),
         ("Sonnet 4.6", "Measured swap", True),
         ("Eval rewired", "G 2.93 re-run", False),
-        ("PostgresSaver", "Docker Compose", True),
+        ("PostgresSaver", "+ JSON ingest logs", True),
     ],
 ]
 
