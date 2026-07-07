@@ -43,9 +43,9 @@ Click through any cell below for the full reasoning behind that decision: what p
 | Foundation | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 → R 2.89 after routing fix; 5 → 0 retrieval failures |
 | Hardening | RAG triad (CR / G / AR), hardened, AR vs ideal answer | 15 | CR 3.0 / G 2.80 / AR 2.93 |
 | Agentic | RAG triad, rewired for agent (ToolMessage extraction) | 15 | CR 3.0 / G 2.73 / AR 2.80 |
-| Ops | RAG triad, same harness; Jul 4 model swap to Sonnet 4.6 | 15 | CR 3.00 / G 2.93 / AR 2.93 |
+| Ops | RAG triad, same harness; Jul 4 model swap to Sonnet 4.6 | 15 | CR 3.00 / G 2.73–2.93 / AR 2.93 |
 
-*Foundation's Faithfulness/Relevance scores aren't directly comparable to the triad scores; they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
+*Foundation's Faithfulness/Relevance scores aren't directly comparable to the triad scores; they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?" Ops groundedness is a range because generation is not temperature-pinned: the same Sonnet agentic eval re-runs between G 2.73 and 2.93 at n=15, which sits on par with the deterministic baseline's 2.80 (tied within run-to-run noise, not a clean win).*
 
 Full write-up (every rejected alternative, the eval delta, and the commit behind each decision) lives in [`docs/architecture.md`](docs/architecture.md).
 

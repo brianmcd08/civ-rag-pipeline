@@ -15,9 +15,9 @@ This is the decision log behind the civ-rag-pipeline: what problem forced each c
 | Foundation | Reference-based (Faithfulness + Relevance vs ideal answers) | 20 baseline → 18 final | F 2.20 / R 2.40 baseline → R 2.89 after a routing fix; 5 → 0 retrieval failures |
 | Hardening | RAG triad (CR / G / AR), hardened, AR vs ideal answer | 15 | CR 3.0 / G 2.80 / AR 2.93 |
 | Agentic | RAG triad, rewired for agent (ToolMessage extraction) | 15 | CR 3.0 / G 2.73 / AR 2.80 |
-| Ops | RAG triad, same harness; Jul 4 model swap to Sonnet 4.6 | 15 | CR 3.00 / G 2.93 / AR 2.93 |
+| Ops | RAG triad, same harness; Jul 4 model swap to Sonnet 4.6 | 15 | CR 3.00 / G 2.73–2.93 / AR 2.93 |
 
-*Foundation's scores aren't directly comparable to the triad scores; they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?"*
+*Foundation's scores aren't directly comparable to the triad scores; they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?" The Ops groundedness is shown as a range because generation is not temperature-pinned: re-running the same Sonnet agentic eval scores G between 2.73 and 2.93 at n=15. That range sits on par with the deterministic baseline's 2.80, so the two builds are read as tied on groundedness within run-to-run noise.*
 
 ## Contents
 
@@ -221,7 +221,7 @@ The training-data override documented above ("The eval breaks") initially drove 
 
 **Refined mechanism.** Prior-vs-context arbitration is capability-dependent and prior-strength-dependent. Haiku grounds facts where its prior is weak and loses only where its prior is confidently wrong (the Jaguar case), regardless of prompting. Sonnet overrides even its own confidently wrong priors.
 
-**The eval.** Full RAG triad with Sonnet as the agent model: CR 3.00 / G 2.93 / AR 2.93, versus 3.00 / 2.73 / 2.80 on Haiku agentic and 3.0 / 2.80 / 2.93 on the Hardening deterministic baseline. Groundedness on the agentic build now exceeds the deterministic baseline.
+**The eval.** Full RAG triad with Sonnet as the agent model, the Jul 4 run: CR 3.00 / G 2.93 / AR 2.93, versus 3.00 / 2.73 / 2.80 on Haiku agentic and 3.0 / 2.80 / 2.93 on the Hardening deterministic baseline. Groundedness on the agentic build lands on par with the deterministic baseline, not clearly above it: re-runs of the Sonnet agentic eval range G 2.73 to 2.93 against the deterministic 2.80, so this reads as parity inside the eval's run-to-run noise (generation is not temperature-pinned, n=15), not a clean win. The takeaway: the Haiku regression was model capability, not the architecture, and with quality between the two builds a wash, the real decision moves to cost versus flexibility rather than groundedness.
 
 **Rejected alternative: the revert itself.** It was the right call on the earlier data and was documented as such; it was superseded when the measurements above landed. It remains the architecture to A/B first under cost constraints or for correctness-critical deployments, because it earns groundedness structurally (constrained generation, no contest) instead of paying for capability.
 
