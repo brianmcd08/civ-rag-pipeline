@@ -30,7 +30,9 @@ def search_units(query: str, version: str | None = None) -> str:
 
 @tool
 def search_leaders(query: str, version: str | None = None) -> str:
-    """Search for civilization leaders, their unique abilities, unique units, and unique improvements.
+    """Search for civilization leaders and their unique abilities. For a civ's
+    unique unit (e.g. the Aztec unique unit), use search_units instead; for its
+    unique building or improvement, use search_buildings_and_improvements.
     Pass version if the user specified one."""
     section_filter = {"section": {"$eq": "leaders"}}
     docs = hybrid_query(
