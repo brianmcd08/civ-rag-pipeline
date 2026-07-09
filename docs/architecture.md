@@ -19,6 +19,16 @@ This is the decision log behind the civ-rag-pipeline: what problem forced each c
 
 *Foundation's scores aren't directly comparable to the triad scores; they measure against ideal answers rather than retrieved chunks. The metric change is itself part of the story: a shift from "is the output good?" to "which stage failed and why?" The Ops groundedness is shown as a range because generation is not temperature-pinned: re-running the same Sonnet agentic eval scores G between 2.73 and 2.93 at n=15. That range sits on par with the deterministic baseline's 2.80, so the two builds are read as tied on groundedness within run-to-run noise.*
 
+## Facts prone to drift
+
+This is the checklist for a consistency sweep against `README.md` and the job-search repo's `ai-rag-agentic/study_guide.md` / `walkthrough_script.md` (see that repo's CLAUDE.md for the sourcing rule: this file is the source, those are derivatives). Run it at real milestones, an interview, a post that cites this material, not continuously. These are the specific facts that have drifted before:
+
+- **Current agent model:** Sonnet 4.6 (`claude-sonnet-4-6`). Haiku 4.5 is the preserved baseline in `evaluation/judgment_haiku_agentic_baseline.csv`, not the live model.
+- **Retrieval/agent constants** (`src/config.py`): `ALPHA = 0.5`, `K_SECTION = 5`, `K_GENERAL = 8`, `RECURSION_LIMIT = 25`, `K_INGEST = 25`. Don't confuse the three 25s with each other, and don't cite Foundation's old default-k=25 as the current retrieval k (it's 5/8 now).
+- **Eval scores per phase** (see table above), especially Ops groundedness: it's a **range**, 2.73-2.93 across re-runs, not a single fixed number, because generation isn't temperature-pinned.
+- **The Jaguar/Eagle Warrior mechanism:** a tool-routing/description bug (`search_leaders`'s docstring), not a training prior overriding correct retrieval. Fixed with a one-line docstring change in commit `4cfde6b`, model-independent (holds on both Haiku and Sonnet).
+- **Agent construction:** `create_agent` (LangChain's factory function, `langchain/agents/factory.py`), not `create_react_agent`. It returns a `langgraph.graph.state.CompiledStateGraph`.
+
 ## Contents
 
 **Foundation (April)**
