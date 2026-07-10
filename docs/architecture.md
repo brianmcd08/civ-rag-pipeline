@@ -196,6 +196,16 @@ The eval pipeline was rewired around `ToolMessage` objects in the agent's messag
 
 Dated the day after the eval fix above, and inside the Agentic window by commit timestamp, but grouped here because it concerns ingestion observability, not the agent. The ingester gained structured JSON logging (consistent fields per log line: batch number, size, sections, versions, status, error type) and per-batch error handling, so a single Pinecone timeout no longer kills the entire ingestion run. In production, those logs would ship to a log aggregator; filtering by `status=error` and grouping by `error_type` separates a data-quality problem (failures concentrated in one section) from a connectivity problem (failures scattered across batches).
 
+## Dedup and version-list metadata (how version filtering actually works)
+
+*(Verified 2026-07-10 against `src/ingestion/ingester.py` and `src/agent/tools.py`, plus Pinecone's documented list-filtering semantics. Documented here because it was previously only implicit, and a prep drill had drifted to the wrong mental model — "version is single-valued per chunk," which is false.)*
+
+**Storage side — version is a list, not a scalar.** `deduplicate()` groups scraped entries by content hash (`entry.generate_hash()`) and keeps the first entry as the representative, **appending every version whose entry shares that identical content into a list**. The upsert then writes that list as the metadata field: `{**entry.generate_metadata(), "bbg_version": versions}`, and the same content hash doubles as the Pinecone vector ID. So content unchanged across 7.3/7.4/7.5 is stored **once**, tagged `bbg_version: ["7.3","7.4","7.5"]`; content that changed in 7.5 gets its own vector tagged `["7.5"]` while the prior one remains `["7.3","7.4"]`. This is what makes the corpus dedup-efficient across versions instead of storing near-duplicate vectors per patch.
+
+**Query side — single scalar `$eq`.** `_build_filter` in `tools.py` emits `{"bbg_version": {"$eq": version}}` with **one** value (or no version filter when it's `None`). Pinecone's `$eq` matches a scalar against a list-valued field by **membership** (documented: `{"bbg_version": {"$eq": "7.5"}}` matches a record stored as `["7.3","7.4","7.5"]`), so a single-version filter correctly returns every chunk valid in that version.
+
+**The consequence for query classes.** Point-in-time ("X in 7.5") works via `$eq` membership; open-ended ("when was X introduced?") works because no version → no filter → search all, earliest `bbg_version` wins. What is **not** handled is a version **range/contrast** ("what changed between 7.1 and 7.5?"): the query side can only send one `$eq` value, so it can't target `{7.1, 7.5}` for a diff. Note this is a **query-side** limitation — storage already supports multiple versions per chunk — so the fix is to let the extractor emit multiple versions and `$in`/fan out at query time (the way section routing already fans out across multiple tools), not a storage change. Section, by contrast, is already handled multi-value at query time (`search_techs_and_civics` filters `section $in [tech_tree, civic_tree]`, and the agent can call several section tools), which is the real section-vs-version asymmetry.
+
 ## Persistent memory and containerization: PostgresSaver + Docker Compose
 
 *(Jun 25)*
