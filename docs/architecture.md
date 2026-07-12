@@ -46,7 +46,7 @@ This is the checklist for a consistency sweep against `README.md` and the job-se
 
 **Agentic (Jun 6–13)**
 - [Parser only: router deleted for the ReAct agent](#parser-only-router-deleted-for-the-react-agent)
-- [ReAct agent with 6 tools and cross-session memory](#react-agent-with-6-tools-and-cross-session-memory)
+- [ReAct agent with 6 tools and conversation memory](#react-agent-with-6-tools-and-conversation-memory)
 - [The eval breaks: what going agentic costs you](#the-eval-breaks-what-going-agentic-costs-you)
 - [Eval rewired: ToolMessage extraction](#eval-rewired-toolmessage-extraction)
 
@@ -160,7 +160,7 @@ Final scores (15 cleaned questions): CR 3.0 / G 2.80 / AR 2.93.
 
 The Section Router chain was deleted entirely. The remaining Query Parser still cleans the query and extracts the version, but section routing is now handled implicitly by the ReAct agent choosing which tools to call.
 
-## ReAct agent with 6 tools and cross-session memory
+## ReAct agent with 6 tools and conversation memory
 
 *(Jun 6, `6ebb6551`, "replace graph pipeline with ReAct agent in generate_response")*
 
@@ -172,7 +172,7 @@ The deterministic LangGraph supervisor was replaced with a `create_agent` (LangC
 
 **What it cost:** less predictability and a runaway-cost risk, bounded with a per-turn recursion limit, a per-tool retrieval cap, and a per-chunk content size limit (the limits were pulled into config shortly after, in `6cd7252`). The recursion limit later bit a real query: on Jun 20 (`7bcef6d`) a multi-section question exhausted `recursion_limit: 10` and crashed with a `GraphRecursionError`. Each tool call costs two graph super-steps: the model's decision to call the tool, then the tool execution, so 10 only bought roughly 4 tool calls. The limit was raised to 25 (LangGraph's default, roughly 12 tool calls) and `agent.invoke` wrapped in a try/except that returns a graceful message on a caught `GraphRecursionError`; the ceiling is headroom, the catch is the real guard.
 
-The agent's state management also made cross-session memory a small addition rather than a rewrite, and the diff confirms they arrived in the *same commit*: `generate_response` gained a `thread_id` parameter and a `RECURSION_LIMIT` config in exactly the change that introduced the agent. A `MemorySaver` checkpointer keyed by `thread_id` persists conversation state across turns and sessions, a different memory mechanism, and a different scope, than the supervisor's reducer, which only accumulated results *within* a single query.
+The agent's state management also made conversation memory a small addition rather than a rewrite, and the diff confirms they arrived in the *same commit*: `generate_response` gained a `thread_id` parameter and a `RECURSION_LIMIT` config in exactly the change that introduced the agent. A `MemorySaver` checkpointer keyed by `thread_id` persists conversation state across turns within a session, a different memory mechanism, and a different scope, than the supervisor's reducer, which only accumulated results *within* a single query. (Persistence *across* sessions is a separate matter, handled later with `PostgresSaver`, and even there the durable store does not by itself resume a returning user's conversation, see [Persistent memory](#persistent-memory-and-containerization-postgressaver--docker-compose) below.)
 
 ## The eval breaks: what going agentic costs you
 
@@ -188,13 +188,19 @@ Re-measured scores on this architecture once the eval was restored (see next ent
 
 *(Jun 12, `600f839`, "eval pipeline fixed")*
 
-The eval pipeline was rewired around `ToolMessage` objects in the agent's message history. The fix pulls them out with `[m.content for m in result["messages"] if isinstance(m, ToolMessage)]`; those contents hold the exact string each tool returned, which is precisely what the LLM saw and the correct input for a groundedness check. Note the return type became `tuple[str, list[str]]`, not `list[Document]` as before the agent; tool outputs are already-formatted strings, so the judges were updated to consume strings. The same commit also generates a fresh `thread_id` per eval question (`str(uuid4())`) so the agent's cross-session memory doesn't bleed context from one eval question into the next and quietly inflate scores.
+The eval pipeline was rewired around `ToolMessage` objects in the agent's message history. The fix pulls them out with `[m.content for m in result["messages"] if isinstance(m, ToolMessage)]`; those contents hold the exact string each tool returned, which is precisely what the LLM saw and the correct input for a groundedness check. Note the return type became `tuple[str, list[str]]`, not `list[Document]` as before the agent; tool outputs are already-formatted strings, so the judges were updated to consume strings. The same commit also generates a fresh `thread_id` per eval question (`str(uuid4())`) so the agent's per-thread memory doesn't bleed context from one eval question into the next and quietly inflate scores.
 
 ## Observable ingestion: structured JSON logging
 
 *(Jun 13, `2f67b3a`, "added structured logging to ingester")*
 
 Dated the day after the eval fix above, and inside the Agentic window by commit timestamp, but grouped here because it concerns ingestion observability, not the agent. The ingester gained structured JSON logging (consistent fields per log line: batch number, size, sections, versions, status, error type) and per-batch error handling, so a single Pinecone timeout no longer kills the entire ingestion run. In production, those logs would ship to a log aggregator; filtering by `status=error` and grouping by `error_type` separates a data-quality problem (failures concentrated in one section) from a connectivity problem (failures scattered across batches).
+
+## Chunking strategy: structure-based, one entity per chunk
+
+*(Verified 2026-07-10 against `src/ingestion/ingester.py` and `src/schema.py`. The term is fixed here as the source of truth because the prep docs had framed this as "no chunking," which is imprecise: one-record-per-chunk is a deliberate chunking strategy, not the absence of one.)*
+
+The corpus uses **structure-based chunking** (also called document-based or structural chunking): each scraped `UnifiedEntry` becomes exactly one chunk. `generate_embedding_text()` concatenates the record's semantic fields into a single embedding string, and that string is one vector and one retrievable unit, so one record = one chunk = one vector. There is **no fixed-size text splitter** anywhere in the pipeline (no `RecursiveCharacterTextSplitter`, no `chunk_size`/`chunk_overlap`): the source is already structured typed records (one unit, one leader, one changelog bullet), not long-form prose, so the chunk boundary already falls on the natural semantic-entity boundary. That sidesteps the size/overlap tuning a splitter needs, no arbitrary window to size, and no overlap because nothing spans a boundary. The one honest gap: there is no length guard, so an unusually long entry would be passed whole to `text-embedding-3-small` and would hit its ~8191-token ceiling rather than degrade gracefully; it hasn't happened because source records are naturally short.
 
 ## Dedup and version-list metadata (how version filtering actually works)
 
