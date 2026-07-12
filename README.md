@@ -15,7 +15,7 @@ Live demo requires password due to API costs; screenshots at the bottom.
 3. **Query parsing**: At query time, a Claude-powered Query Parser cleans the user's question (fixing typos, removing explicit version references) and extracts the target BBG version. Version context is injected into the agent's input for use in tool calls.
 4. **Agentic retrieval**: A ReAct agent receives the cleaned query and reasons at runtime about which search tools to call. Six tools cover the main content sections (units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all). Each tool issues a hybrid query combining dense semantic search and BM25 sparse keyword search; the dense and sparse vectors are alpha-weighted (`ALPHA = 0.5`) and combined in a single Pinecone hybrid query, with version and section metadata filters applied per call. The agent can call multiple tools in sequence when a question spans sections.
 5. **Generation**: The agent synthesizes retrieved results into a response grounded in the source data.
-6. **Memory**: Conversation state is persisted across turns and container restarts via a `PostgresSaver` checkpointer backed by a Postgres database (Docker Compose). The public Streamlit Community Cloud deployment cannot host the Postgres sidecar, so it runs the in-memory `MemorySaver` fallback: conversation state holds within a session but does not survive an app restart. Durable `PostgresSaver` persistence is the self-hosted Docker Compose configuration. Each Streamlit session gets its own `thread_id` so context carries through a session; a new session starts fresh. (`thread_id` persistence across sessions via cookie or query param is the noted next step.)
+6. **Memory**: Conversation state is persisted across turns and container restarts via a `PostgresSaver` checkpointer backed by a Postgres database (Docker Compose). The public Streamlit Community Cloud deployment cannot host a co-located Postgres service, so it runs the in-memory `MemorySaver` fallback: conversation state holds within a session but does not survive an app restart. Durable `PostgresSaver` persistence is the self-hosted Docker Compose configuration. Each Streamlit session gets its own `thread_id` so context carries through a session; a new session starts fresh. (`thread_id` persistence across sessions via cookie or query param is the noted next step.)
 7. **Evaluation**: Every architecture change is measured against a RAG triad eval harness: context relevance (did retrieval surface the right chunks?), groundedness (is the response supported by those chunks?), and answer relevance (does it answer the question?), three parallel LLM-as-judge evaluators scored against a fixed question set.
 8. **UI**: A Streamlit app serves the chatbot with per-session thread tracking, a sidebar with an About section and example questions.
 
@@ -138,6 +138,8 @@ docker compose up
 
 The `app` service waits for the `db` healthcheck (`pg_isready`) to pass before starting. Conversation memory is written to a named Postgres volume (`pgdata`) and survives `docker compose restart`; it is only dropped with `docker compose down -v`.
 
+The `db` service is a co-located Compose service, not a Kubernetes sidecar (which is a stateless helper sharing an app's pod). In production it would be replaced by a managed Postgres (RDS / Cloud SQL / Azure Database for PostgreSQL), selected by the same `DATABASE_URL` with no code change; `docker-compose.yml` is a local-dev convenience, while the portable artifact is the `Dockerfile` image.
+
 **Environment variables** (injected at runtime, never baked into the image; API keys via `env_file: .env`, `DATABASE_URL` set in the Compose `environment:` block for the local stack):
 
 | Variable | Purpose |
@@ -149,7 +151,7 @@ The `app` service waits for the `db` healthcheck (`pg_isready`) to pass before s
 | `DATABASE_URL` | Postgres connection string, e.g. `postgresql://civ:civ@db:5432/civ` |
 | `APP_PASSWORD` | Password gate for the Streamlit UI |
 
-Secrets are excluded from the image via `.dockerignore`. When `DATABASE_URL` is not set, the app falls back to an in-memory `MemorySaver` checkpointer automatically; this is the case both for local development without Postgres and for the hosted Streamlit Community Cloud deployment, which cannot run the Postgres sidecar.
+Secrets are excluded from the image via `.dockerignore`. When `DATABASE_URL` is not set, the app falls back to an in-memory `MemorySaver` checkpointer automatically; this is the case both for local development without Postgres and for the hosted Streamlit Community Cloud deployment, which cannot run a co-located Postgres service.
 
 ---
 
