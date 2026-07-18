@@ -13,6 +13,7 @@ from src.agent.tools import (
     search_techs_and_civics,
     search_units,
 )
+from src.logging_config import logger
 
 db_uri = os.getenv("DATABASE_URL")
 if db_uri:
@@ -20,10 +21,16 @@ if db_uri:
         conn = psycopg.connect(db_uri, autocommit=True, row_factory=dict_row)  # pyright: ignore[reportArgumentType]
         checkpointer = PostgresSaver(conn)  # pyright: ignore[reportArgumentType]
         checkpointer.setup()
-    except Exception:
+        logger.info("PostgresSaver is ready")
+    except Exception as e:
+        logger.exception(
+            f"{str(e)}. Error connecting to the Postgres db. Falling back to MemorySaver"
+        )
         checkpointer = MemorySaver()
+        logger.info("MemorySaver is ready")
 else:
     checkpointer = MemorySaver()
+    logger.info("MemorySaver is ready")
 
 tool_list = [
     search_buildings_and_improvements,
