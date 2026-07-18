@@ -5,7 +5,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+# Serve extra only: the deployed image excludes the ingest/eval/notebook stack.
+RUN uv sync --frozen --no-dev --extra serve
 
 COPY . .
 

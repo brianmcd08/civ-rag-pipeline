@@ -7,8 +7,8 @@ Regenerate after any phase/stage change:
 Gray = stage carried over unchanged; blue = deliberate architecture decision.
 """
 
-import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch
+import matplotlib.pyplot as plt  # pyright: ignore[reportMissingImports]  # dev-only, run via `uv run --with matplotlib`
+from matplotlib.patches import FancyBboxPatch  # pyright: ignore[reportMissingImports]
 
 # --- style ---------------------------------------------------------------
 GRAY_FILL = "#C4BEB2"

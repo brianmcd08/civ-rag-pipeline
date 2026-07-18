@@ -60,7 +60,7 @@ The agent model is Claude Sonnet 4.6, selected by measurement rather than defaul
 ## Project structure
 
 ```
-Dockerfile                  # Single-container image (uv, lockfile-first layer caching)
+Dockerfile                  # Single-container image (uv, lockfile-first layer caching, serve extra only)
 docker-compose.yml          # Two services: app + db (postgres:16), named volume for persistence
 src/
 ├── scraping/           # One scraper per BBG data section
@@ -115,7 +115,7 @@ The chatbot understands version-specific, cross-version, and multi-section quest
 `ingester.py` is an admin-only local script. If you modify any scraper, the `generate_embedding_text()` method in `schema.py`, or add a new BBG version to the `Version` enum, re-run the ingester to push updated vectors to Pinecone:
 
 ```bash
-uv run python -m src.ingestion.ingester
+uv run --extra ingest python -m src.ingestion.ingester
 ```
 
 The ingester upserts by ID (entry hash), so re-running is additive: existing vectors are overwritten only if the content hash changes, and new entries are added. You do not need to clear the Pinecone index manually before re-ingesting.
@@ -158,8 +158,10 @@ Secrets are excluded from the image via `.dockerignore`. When `DATABASE_URL` is 
 ## Running tests
 
 ```bash
-uv run pytest
+uv run --all-extras pytest
 ```
+
+The suite spans the `serve` and `ingest` extras (integration tests hit both the agent pipeline and the scrapers), so `--all-extras` ensures every dependency is present.
 
 ---
 
