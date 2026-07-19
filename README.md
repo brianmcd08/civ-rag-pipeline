@@ -110,6 +110,21 @@ The chatbot understands version-specific, cross-version, and multi-section quest
 
 ---
 
+## HTTP API
+
+The pipeline is also exposed as a FastAPI service (`src/api.py`), so the RAG backend can be called over HTTP independently of the Streamlit UI:
+
+```bash
+uv run --extra api uvicorn src.api:app --port 8000
+```
+
+- `GET /health` returns `{"status": "ok"}`.
+- `POST /query` with `{"query": "...", "thread_id": "...", "history": []}` returns `{"response": "...", "documents": [...]}`. `thread_id` selects the conversation thread for memory; interactive docs are at `/docs`.
+
+The agent and its Postgres-backed checkpointer are built once on startup via a FastAPI lifespan over a `psycopg` connection pool, so concurrent requests each borrow their own connection. With no `DATABASE_URL` set the service falls back to in-memory conversation state.
+
+---
+
 ## Re-ingestion
 
 `ingester.py` is an admin-only local script. If you modify any scraper, the `generate_embedding_text()` method in `schema.py`, or add a new BBG version to the `Version` enum, re-run the ingester to push updated vectors to Pinecone:

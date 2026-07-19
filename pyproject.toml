@@ -18,13 +18,27 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Query-serving path (the deployed artifact). Streamlit UI stays here for now;
-# it splits into an `api` (FastAPI) extra when the FastAPI wrap lands.
-serve = [
+# Shared serving stack: the agent runtime + Postgres-backed checkpointer with a
+# connection pool. Imported by construct_agents.py, so BOTH client extras below
+# (serve = Streamlit, api = FastAPI) depend on it. Neither client's deps leak
+# into the other.
+serve-core = [
     "langgraph>=1.2.3",
     "langgraph-checkpoint-postgres>=3.1.0",
     "psycopg[binary]>=3.3.4",
+    "psycopg-pool>=3.3.1",
+]
+# Streamlit client (one front-end over serve-core).
+serve = [
+    "civilization-chatbot[serve-core]",
     "streamlit>=1.56.0",
+]
+# FastAPI client (the deployed API; step 3 wraps this in a container-image
+# Lambda and adds Mangum). Deliberately excludes Streamlit.
+api = [
+    "civilization-chatbot[serve-core]",
+    "fastapi>=0.139.2",
+    "uvicorn[standard]>=0.51.0",
 ]
 # Scrape + embed + upsert to Pinecone. Runs locally on demand, never deployed.
 ingest = [
@@ -32,10 +46,10 @@ ingest = [
     "langchain-community>=0.4.2",
     "requests>=2.33.1",
 ]
-# Offline eval harness. Imports generate_response in-process (hence [serve]) and
-# the raw anthropic SDK directly for the judges. Runs locally, never deployed.
+# Offline eval harness. Imports generate_response in-process (hence serve-core)
+# and the raw anthropic SDK directly for the judges. Runs locally, never deployed.
 eval = [
-    "civilization-chatbot[serve]",
+    "civilization-chatbot[serve-core]",
     "anthropic>=0.96.0",
 ]
 

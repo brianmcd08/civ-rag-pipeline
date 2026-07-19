@@ -14,7 +14,9 @@ from langchain_core.runnables import RunnableConfig
 
 from src.config import ANTHROPIC_MODEL, RECURSION_LIMIT
 from src.retrieval import version_extractor as ve
-from src.agent.construct_agents import agent
+from src.agent.construct_agents import get_agent
+
+agent = get_agent()
 
 QUESTION = "What is the Aztec unique unit in version 7.5?"
 CHALLENGE = "Are you sure?"

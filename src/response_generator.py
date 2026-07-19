@@ -3,8 +3,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.errors import GraphRecursionError
 
 from src.retrieval import version_extractor as ve
-from src.config import RECURSION_LIMIT
-from src.agent.construct_agents import agent
+from src.config import HISTORY_LIMIT, RECURSION_LIMIT
 
 NO_ANSWER_MESSAGE = (
     "I wasn't able to find a confident answer to that — try rephrasing or "
@@ -12,7 +11,22 @@ NO_ANSWER_MESSAGE = (
 )
 
 
-def generate_response(query: str, history: list, thread_id: str) -> tuple[str, list[str]]:
+def generate_response(
+    query: str, history: list, thread_id: str, agent=None
+) -> tuple[str, list[str]]:
+    if agent is None:
+        # Streamlit / eval / tests path: reuse the lazily-built process-wide
+        # agent. The FastAPI service passes its own lifespan-built agent.
+        from src.agent.construct_agents import get_agent
+
+        agent = get_agent()
+
+    # Enforce the memory window here so every client (Streamlit, API, eval)
+    # inherits it; app.py's own slice is then a harmless no-op. Without this,
+    # an API caller could send unbounded history straight into the parser
+    # prompt.
+    history = history[-HISTORY_LIMIT:]
+
     parsed_query = ve.query_parser(query, history)
     message = parsed_query.cleaned_query
 
