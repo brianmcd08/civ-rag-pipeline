@@ -98,10 +98,12 @@ ipython_config.py
 #Pipfile.lock
 
 # UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
+#   Normally recommended to commit, but Streamlit Community Cloud gives uv.lock top
+#   precedence over requirements.txt for dependency resolution and only installs the
+#   base [project.dependencies] group from it, silently dropping the `serve` extra
+#   (psycopg, langgraph) the deployed app needs. Untracked so Streamlit Cloud falls
+#   through to requirements.txt. See docs/architecture.md, "Deploy" section.
+uv.lock
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
