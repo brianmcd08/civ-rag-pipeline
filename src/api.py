@@ -1,3 +1,4 @@
+from mangum import Mangum
 from typing import Literal
 
 from pydantic import BaseModel
@@ -65,3 +66,6 @@ def query(req: QueryRequest, request: Request):
         agent=request.app.state.agent,
     )
     return QueryResponse(response=answer, documents=documents)
+
+
+handler = Mangum(app)

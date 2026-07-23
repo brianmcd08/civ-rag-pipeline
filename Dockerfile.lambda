@@ -1,0 +1,13 @@
+FROM public.ecr.aws/lambda/python:3.12
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+COPY pyproject.toml uv.lock ./
+
+# api extra only, installed into the task root — Lambda's runtime doesn't use a venv.
+RUN uv export --frozen --no-dev --no-emit-project --extra api -o requirements.txt && \
+    uv pip install -r requirements.txt --target ${LAMBDA_TASK_ROOT}
+
+COPY . ${LAMBDA_TASK_ROOT}
+
+CMD ["src.api.handler"]

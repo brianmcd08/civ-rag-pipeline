@@ -1,11 +1,11 @@
 import os
 
-from langchain_anthropic import ChatAnthropic
 from enum import StrEnum
 from src.secrets import get_secret
 
-
-os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")
+if LLM_PROVIDER != "bedrock":
+    os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
 
 
 class Version(StrEnum):
@@ -76,4 +76,11 @@ RECURSION_LIMIT = 25
 CHUNK_CONTENT_LIMIT = 1500
 
 
-llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=LLM_TIMEOUT)
+if LLM_PROVIDER == "bedrock":
+    from langchain_aws import ChatBedrockConverse
+
+    llm = ChatBedrockConverse(model=os.environ["BEDROCK_MODEL_ID"])
+else:
+    from langchain_anthropic import ChatAnthropic
+
+    llm = ChatAnthropic(model_name=ANTHROPIC_MODEL, stop=[], timeout=LLM_TIMEOUT)

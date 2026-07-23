@@ -38,6 +38,8 @@ serve = [
 api = [
     "civilization-chatbot[serve-core]",
     "fastapi>=0.139.2",
+    "langchain-aws>=1.6.3",
+    "mangum>=0.21.0",
     "uvicorn[standard]>=0.51.0",
 ]
 # Scrape + embed + upsert to Pinecone. Runs locally on demand, never deployed.
