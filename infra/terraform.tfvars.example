@@ -5,6 +5,10 @@
 # values also land in terraform.tfstate in plaintext, which is why *.tfstate*
 # is git-ignored as well.
 
+# Shared secret for POST /query, sent by the caller as the X-API-Key header.
+# Generate with: openssl rand -hex 32
+api_shared_secret = ""
+
 # Neon pooled connection string (the host containing "-pooler").
 database_url = "postgresql://user:pass@host-pooler.region.aws.neon.tech/dbname?sslmode=require"
 

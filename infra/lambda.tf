@@ -29,6 +29,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       LLM_PROVIDER           = "bedrock"
       BEDROCK_MODEL_ID       = var.bedrock_model_id
+      API_SHARED_SECRET      = var.api_shared_secret
       DATABASE_URL           = var.database_url
       OPENAI_API_KEY         = var.openai_api_key
       PINECONE_API_KEY       = var.pinecone_api_key

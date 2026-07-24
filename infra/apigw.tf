@@ -27,11 +27,13 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
-  # This endpoint is public, unauthenticated, and every call costs Bedrock
-  # tokens. Throttling is the first brake on a runaway bill.
+  # /query now requires a shared secret, so this is the second brake rather
+  # than the only one. Kept low anyway: it caps how fast an unauthenticated
+  # caller can burn Lambda invocations on 401s, which the app-level check
+  # cannot prevent (the function still has to run to reject the request).
   default_route_settings {
-    throttling_rate_limit  = 2
-    throttling_burst_limit = 5
+    throttling_rate_limit  = 1
+    throttling_burst_limit = 2
   }
 }
 

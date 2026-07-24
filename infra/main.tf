@@ -44,6 +44,12 @@ variable "database_url" {
   sensitive   = true
 }
 
+variable "api_shared_secret" {
+  description = "Shared secret the caller sends as X-API-Key on POST /query."
+  type        = string
+  sensitive   = true
+}
+
 variable "openai_api_key" {
   description = "Embeddings stay on OpenAI regardless of LLM_PROVIDER."
   type        = string

@@ -4,7 +4,7 @@ A production-grade, agentic RAG system that answers questions about the Better G
 
 🟢 **Live app:** [civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app](https://civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app/) *(password required)*
 
-☁️ **Also deployed on AWS** as a container-image Lambda behind API Gateway with inference on Amazon Bedrock, Terraform-managed in [`infra/`](infra/). Endpoint available on request; it is unauthenticated and every request costs tokens, so it is not published here.
+☁️ **Also deployed on AWS** as a container-image Lambda behind API Gateway with inference on Amazon Bedrock, Terraform-managed in [`infra/`](infra/). Endpoint available on request: `POST /query` requires a shared-secret `X-API-Key` header and every request costs tokens, so neither the URL nor the key is published here.
 
 Live demo requires password due to API costs; screenshots at the bottom.
 
