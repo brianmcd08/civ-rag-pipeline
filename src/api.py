@@ -1,17 +1,16 @@
-from mangum import Mangum
+from contextlib import asynccontextmanager
 from secrets import compare_digest
 from typing import Literal
 
-from pydantic import BaseModel
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
+from mangum import Mangum
+from pydantic import BaseModel
 
-from contextlib import asynccontextmanager
-from src.agent.construct_agents import build_checkpointer, build_agent
+from src.agent.construct_agents import build_agent, build_checkpointer
 from src.config import API_KEY_HEADER_NAME
 from src.response_generator import generate_response
 from src.secrets import get_secret
-
 
 # Loaded at import so a misconfigured deployment refuses to start rather than
 # coming up with an open /query. Same fail-fast posture as the checkpointer

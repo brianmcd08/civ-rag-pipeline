@@ -1,6 +1,6 @@
 import os
-
 from enum import StrEnum
+
 from src.secrets import get_secret
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")

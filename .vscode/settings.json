@@ -7,11 +7,17 @@
     "python.analysis.indexing": true,
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.typeCheckingMode": "standard",
-    "basedpyright.analysis.diagnosticMode": "workspace",
-    "basedpyright.analysis.typeCheckingMode": "standard",
+    "python.languageServer": "Pylance",
     "terminal.integrated.env.linux": {
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
     },
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
+            "source.fixAll": "explicit"
+        }
+    }
 }
