@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is git-ignored;
+# Terraform auto-loads it, so no -var-file flag is needed.
+#
+# Mirrors the .env / .env.example pattern at the repo root. Note that these
+# values also land in terraform.tfstate in plaintext, which is why *.tfstate*
+# is git-ignored as well.
+
+# Neon pooled connection string (the host containing "-pooler").
+database_url = "postgresql://user:pass@host-pooler.region.aws.neon.tech/dbname?sslmode=require"
+
+# Embeddings stay on OpenAI regardless of LLM_PROVIDER.
+openai_api_key = ""
+
+pinecone_api_key       = ""
+pinecone_index_name_v2 = "civ6-bbg-v2"

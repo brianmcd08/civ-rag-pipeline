@@ -39,3 +39,13 @@ cover/
 .claude/
 .cursorignore
 .cursorindexingignore
+
+# Terraform state and tfvars hold every secret in plaintext.
+infra/
+
+# Not needed at runtime; trimming these cuts image size and cold start.
+tests/
+evaluation/
+docs/
+build/
+.vscode/

@@ -8,6 +8,12 @@ COPY pyproject.toml uv.lock ./
 RUN uv export --frozen --no-dev --no-emit-project --extra api -o requirements.txt && \
     uv pip install -r requirements.txt --target ${LAMBDA_TASK_ROOT}
 
+# pinecone-text's BM25 tokenizer downloads these NLTK corpora on first use, and
+# Lambda's filesystem is read-only outside /tmp. Bake them in at build time and
+# point NLTK at the baked copy so no download is attempted at runtime.
+ENV NLTK_DATA=${LAMBDA_TASK_ROOT}/nltk_data
+RUN PYTHONPATH=${LAMBDA_TASK_ROOT} python -m nltk.downloader -d ${NLTK_DATA} punkt_tab stopwords
+
 COPY . ${LAMBDA_TASK_ROOT}
 
 CMD ["src.api.handler"]

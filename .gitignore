@@ -215,3 +215,10 @@ chroma_langchain_db/
 .streamlit/secrets.toml
 
 .claude/
+
+# Terraform
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example

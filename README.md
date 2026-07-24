@@ -4,6 +4,8 @@ A production-grade, agentic RAG system that answers questions about the Better G
 
 🟢 **Live app:** [civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app](https://civ-chatbot-9vnbxfeptmdajugzgdzemr.streamlit.app/) *(password required)*
 
+☁️ **Also deployed on AWS** as a container-image Lambda behind API Gateway with inference on Amazon Bedrock, Terraform-managed in [`infra/`](infra/). Endpoint available on request; it is unauthenticated and every request costs tokens, so it is not published here.
+
 Live demo requires password due to API costs; screenshots at the bottom.
 
 ---
@@ -61,7 +63,9 @@ The agent model is Claude Sonnet 4.6, selected by measurement rather than defaul
 
 ```
 Dockerfile                  # Single-container image (uv, lockfile-first layer caching, serve extra only)
+Dockerfile.lambda           # AWS Lambda container image (api extra into /var/task, NLTK corpora baked in)
 docker-compose.yml          # Two services: app + db (postgres:16), named volume for persistence
+infra/                      # Terraform for the AWS deploy: ECR, IAM, Lambda, API Gateway, plus deploy.sh
 src/
 ├── scraping/           # One scraper per BBG data section
 │   ├── scrape_orchestrator.py  # Runs all scrapers
@@ -155,11 +159,28 @@ The `app` service waits for the `db` healthcheck (`pg_isready`) to pass before s
 
 The `db` service is a co-located Compose service, not a Kubernetes sidecar (which is a stateless helper sharing an app's pod). In production it would be replaced by a managed Postgres (RDS / Cloud SQL / Azure Database for PostgreSQL), selected by the same `DATABASE_URL` with no code change; `docker-compose.yml` is a local-dev convenience, while the portable artifact is the `Dockerfile` image.
 
+### AWS serverless deploy
+
+The same FastAPI service also runs on AWS as a **container-image Lambda behind an API Gateway HTTP API**, with inference served by **Amazon Bedrock** (Claude Sonnet 4.6, via the `global.anthropic.claude-sonnet-4-6` inference profile) rather than the Anthropic API. Infrastructure is Terraform-managed in `infra/`: an ECR repository with a lifecycle policy, the Lambda execution role with a Bedrock invoke policy scoped to that one model, a CloudWatch log group with retention, the function itself (built from `Dockerfile.lambda`, x86_64, 2048 MB), and the HTTP API with `GET /health` and `POST /query` routes.
+
+```bash
+cd infra
+cp terraform.tfvars.example terraform.tfvars   # fill in secrets
+terraform init
+./deploy.sh                                    # build, push to ECR, terraform apply
+```
+
+Which provider is used is selected at runtime by `LLM_PROVIDER`, and only the Lambda sets it to `bedrock`; Streamlit Community Cloud and local development continue to use the direct Anthropic client. The function runs **outside a VPC** deliberately, since a VPC-attached Lambda needs a NAT Gateway (roughly $32/month) to reach Neon, Pinecone, OpenAI, and Bedrock. Conversation memory is the same Neon Postgres the Streamlit deployment uses, so a `thread_id` is durable across both surfaces.
+
+Cold starts are significant, since the init phase imports LangChain, boto3, and psycopg, and API Gateway caps integration timeouts at 30 seconds; the practical effect is that a first request after an idle period can time out while the container finishes warming, and a retry succeeds. Warm latency is about 51ms for `/health` and about 9s for `/query`. The measurements, the rejected alternatives, and the two failures that appeared only once deployed are in [`docs/architecture.md`](docs/architecture.md#aws-deploy-container-image-lambda-behind-api-gateway-inference-on-bedrock).
+
 **Environment variables** (injected at runtime, never baked into the image; API keys via `env_file: .env`, `DATABASE_URL` set in the Compose `environment:` block for the local stack):
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude API (query parsing, generation, eval judges) |
+| `ANTHROPIC_API_KEY` | Claude API (query parsing, generation, eval judges). Not required when `LLM_PROVIDER=bedrock` |
+| `LLM_PROVIDER` | `bedrock` selects `ChatBedrockConverse`; unset or anything else uses the Anthropic API (the default) |
+| `BEDROCK_MODEL_ID` | Bedrock inference profile id, read only when `LLM_PROVIDER=bedrock` |
 | `OPENAI_API_KEY` | Embedding model (`text-embedding-3-small`) |
 | `PINECONE_API_KEY` | Vector database |
 | `PINECONE_INDEX_NAME_V2` | Pinecone index name for the hybrid (dense + sparse) index |
