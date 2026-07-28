@@ -17,7 +17,7 @@ Live demo requires password due to API costs; screenshots at the bottom.
 3. **Query parsing**: At query time, a Claude-powered Query Parser cleans the user's question (fixing typos, removing explicit version references) and extracts the target BBG version. Version context is injected into the agent's input for use in tool calls.
 4. **Agentic retrieval**: A ReAct agent receives the cleaned query and reasons at runtime about which search tools to call. Six tools cover the main content sections (units, leaders, great people, techs & civics, buildings & improvements, and a general catch-all). Each tool issues a hybrid query combining dense semantic search and BM25 sparse keyword search; the dense and sparse vectors are alpha-weighted (`ALPHA = 0.5`) and combined in a single Pinecone hybrid query, with version and section metadata filters applied per call. The agent can call multiple tools in sequence when a question spans sections.
 5. **Generation**: The agent synthesizes retrieved results into a response grounded in the source data.
-6. **Memory**: Conversation state is persisted across turns and restarts via a `PostgresSaver` checkpointer backed by Postgres. Both deployments are durable: the self-hosted Docker Compose stack uses a co-located `db` service, and the public Streamlit Community Cloud deployment uses an external free-tier managed Postgres (Neon) set via a `DATABASE_URL` secret. `MemorySaver` is the automatic fallback only when `DATABASE_URL` is unset (e.g. local development without Postgres). Each Streamlit session gets its own `thread_id` so context carries through a session; a new session starts fresh. (`thread_id` persistence across sessions via cookie or query param is the noted next step.)
+6. **Memory**: Conversation state is persisted across turns and restarts via a `PostgresSaver` checkpointer backed by Postgres. All three serving surfaces are durable: the self-hosted Docker Compose stack uses a co-located `db` service, while the public Streamlit Community Cloud deployment and the AWS Lambda both point at the same external free-tier managed Postgres (Neon) via a `DATABASE_URL` secret, so a `thread_id` is durable across surfaces. `MemorySaver` is the automatic fallback when `DATABASE_URL` is unset (e.g. local development without Postgres) and also when a `DATABASE_URL` that is set cannot be reached; the fallback is logged, so a degraded deployment is visible rather than silent. Each Streamlit session gets its own `thread_id` so context carries through a session; a new session starts fresh. (`thread_id` persistence across sessions via cookie or query param is the noted next step.)
 7. **Evaluation**: Every architecture change is measured against a RAG triad eval harness: context relevance (did retrieval surface the right chunks?), groundedness (is the response supported by those chunks?), and answer relevance (does it answer the question?), three independent LLM-as-judge evaluators scored against a fixed question set.
 8. **UI**: A Streamlit app serves the chatbot with per-session thread tracking, a sidebar with an About section and example questions.
 
@@ -25,7 +25,7 @@ Live demo requires password due to API costs; screenshots at the bottom.
 
 ## Architecture evolution
 
-Each change was driven by a specific, measured failure in the state before it, not a rewrite for its own sake. The work fell into four phases: an **April baseline** (Foundation), a **June 1–5 hardening sprint** (Hardening), a **June 6–13 agentic experiment** (Agentic), and a **June 25 – July 4 operations phase** (Ops: containerization and persistent memory, then a measured model swap). The diagram tracks five pipeline stages across those phases: gray means a stage carried over unchanged, blue means a deliberate architecture decision.
+Each change was driven by a specific, measured failure in the state before it, not a rewrite for its own sake. The work fell into four phases: an **April baseline** (Foundation), a **June 1–5 hardening sprint** (Hardening), a **June 6–13 agentic experiment** (Agentic), and a **June 25 – July 8 operations phase** (Ops: containerization and persistent memory, a measured model swap, then a trace-level re-diagnosis of that swap's own motivating failure). The diagram tracks five pipeline stages across those phases: gray means a stage carried over unchanged, blue means a deliberate architecture decision.
 
 ![Architecture evolution](docs/civ_rag_evolution.png)
 
@@ -36,7 +36,7 @@ Click through any cell below for the full reasoning behind that decision: what p
 | **Foundation** · Apr | [Extractor: 1 LLM call](docs/architecture.md#extractor-one-combined-llm-call) | [1 section, dense only](docs/architecture.md#1-section-dense-only) | [Persona: Montezuma](docs/architecture.md#persona-the-montezuma-voice) | [Reference eval](docs/architecture.md#reference-eval-faithfulness-and-relevance-vs-ideal-answers) | N/A |
 | **Hardening** · Jun 1–5 | [2 chains](docs/architecture.md#2-chains-splitting-parser-and-router) | [Multi-section, hybrid (α-weighted)](docs/architecture.md#multi-section-retrieval-with-hybrid-search) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [RAG triad, hardened](docs/architecture.md#rag-triad-context-relevance-groundedness-answer-relevance) | N/A |
 | **Agentic** · Jun 6–13 | [Parser only](docs/architecture.md#parser-only-router-deleted-for-the-react-agent) | [ReAct agent, 6 tools + memory](docs/architecture.md#react-agent-with-6-tools-and-conversation-memory) | [No persona](docs/architecture.md#persona-removed-the-controlled-experiment) | [Eval rewired](docs/architecture.md#eval-rewired-toolmessage-extraction) | [MemorySaver](docs/architecture.md#react-agent-with-6-tools-and-conversation-memory) |
-| **Ops** · Jun 25 – Jul 4 | ← same | ← same | [Sonnet 4.6: measured swap](docs/architecture.md#prior-override-investigation-the-measured-model-swap) | ← same | [Observable ingestion](docs/architecture.md#observable-ingestion-structured-json-logging), [PostgresSaver + Docker Compose](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) |
+| **Ops** · Jun 25 – Jul 8 | [Re-diagnosis: a tool-routing bug](docs/architecture.md#re-diagnosis-the-jaguar-was-a-tool-routing-bug-not-prior-override) | ← same | [Sonnet 4.6: measured swap](docs/architecture.md#prior-override-investigation-the-measured-model-swap) | ← same | [Observable ingestion](docs/architecture.md#observable-ingestion-structured-json-logging), [PostgresSaver + Docker Compose](docs/architecture.md#persistent-memory-and-containerization-postgressaver--docker-compose) |
 
 **Eval scores by phase** (mechanics are commit-verified; score numbers are from recorded eval runs):
 
@@ -55,7 +55,9 @@ Full write-up (every rejected alternative, the eval delta, and the commit behind
 
 ## Model choice
 
-The agent model is Claude Sonnet 4.6, selected by measurement rather than default. Haiku 4.5 exhibited a training-data override failure (confidently wrong answers with the correct chunk present in tool output) that prompting measurably could not fix. Sonnet was validated with grounding probes built on facts where this corpus diverges from vanilla Civ 6 values (12 of 12 grounded, even where the model's raw prior is confidently wrong) and with the RAG triad scores in the table above. The tradeoff is cost: Sonnet is 3x Haiku per token. The full investigation, including the revert that was considered and superseded by measurement, is in [`docs/architecture.md`](docs/architecture.md#prior-override-investigation-the-measured-model-swap); the probe scripts are in `evaluation/`.
+The agent model is Claude Sonnet 4.6. The swap was motivated by a class of confidently wrong answers (Civ 5 values substituted for BBG ones), first read as a training prior overriding retrieval. A later trace-level re-investigation corrected that root cause: the canonical case was a **tool-routing bug**, since `search_leaders`'s docstring advertised unique units while unit records live in the `units` section, so the right chunk was never retrieved at all. The fix is one docstring line, and it is model-independent, holding on Haiku 4.5 as well.
+
+What the measurement does support is grounding: probes built on facts where this corpus diverges from vanilla Civ 6 ground 12 of 12 through the pipeline against 0 of 12 from the raw model. On the RAG triad the two builds are a wash (Sonnet agentic re-runs score G 2.73–2.93 against the deterministic baseline's 2.80 at n=15), so the model decision rests on cost versus flexibility rather than groundedness; Sonnet is 3x Haiku per token. The full investigation, including the revert that was considered and superseded by measurement, is in [`docs/architecture.md`](docs/architecture.md#re-diagnosis-the-jaguar-was-a-tool-routing-bug-not-prior-override); the probe scripts are in `evaluation/`.
 
 ---
 
@@ -86,7 +88,8 @@ src/
 ├── logging_config.py     # Structlog configuration: shared logger for structured JSON output
 ├── utils.py              # format_docs helper
 ├── secrets.py            # Reads from st.secrets (cloud) or .env (local)
-└── response_generator.py # Pipeline entry point: query parsing + agent invocation
+├── response_generator.py # Pipeline entry point: query parsing + agent invocation
+└── api.py                # FastAPI service (POST /query, GET /health) + Mangum handler for Lambda
 evaluation/              # RAG triad eval pipeline
 ├── eval_runner.py              # Runs RAG triad eval across question set
 ├── schema.py                   # PartialJudgment and Judgment types
@@ -125,7 +128,7 @@ uv run --extra api uvicorn src.api:app --port 8000
 - `GET /health` returns `{"status": "ok"}`.
 - `POST /query` with `{"query": "...", "thread_id": "...", "history": []}` returns `{"response": "...", "documents": [...]}`. `thread_id` selects the conversation thread for memory; interactive docs are at `/docs`.
 
-The agent and its Postgres-backed checkpointer are built once on startup via a FastAPI lifespan over a `psycopg` connection pool, so concurrent requests each borrow their own connection. With no `DATABASE_URL` set the service falls back to in-memory conversation state.
+The agent and its Postgres-backed checkpointer are built via a FastAPI lifespan over a `psycopg` connection pool, so concurrent requests each borrow their own connection. Under uvicorn that happens once per process, on startup. On Lambda, Mangum runs the lifespan once per *invocation*, so the pool and agent are rebuilt per request; details in [`docs/architecture.md`](docs/architecture.md#aws-deploy-container-image-lambda-behind-api-gateway-inference-on-bedrock). With no `DATABASE_URL` set the service falls back to in-memory conversation state.
 
 ---
 
@@ -137,7 +140,9 @@ The agent and its Postgres-backed checkpointer are built once on startup via a F
 uv run --extra ingest python -m src.ingestion.ingester
 ```
 
-The ingester upserts by ID (entry hash), so re-running is additive: existing vectors are overwritten only if the content hash changes, and new entries are added. You do not need to clear the Pinecone index manually before re-ingesting.
+The ingester upserts by ID (the entry's content hash), so a re-run is a full idempotent rebuild rather than a delta: a record whose hashed content is unchanged keeps its ID and overwrites itself, and a genuinely new record is inserted under a new ID.
+
+The gap worth knowing is that the pipeline **never deletes**. Pure additions and metadata-only edits are clean, but an edit to a hashed field (section, name, or description) lands under a new ID while the old vector stays live with its original `bbg_version` list, so a version-filtered query can retrieve both the old and the new fact. A removal leaves an orphan. Until ID-diff pruning exists, clear the Pinecone index before re-ingesting if you have edited or removed content; adding content alone needs no clear. See [`docs/architecture.md`](docs/architecture.md#dedup-and-version-list-metadata-how-version-filtering-actually-works) for the mechanism.
 
 The ingester also re-fits the BM25 encoder on the full corpus and overwrites `models/bm25_values.json`. Commit the updated file after re-ingesting.
 
@@ -172,7 +177,7 @@ terraform init
 
 Which provider is used is selected at runtime by `LLM_PROVIDER`, and only the Lambda sets it to `bedrock`; Streamlit Community Cloud and local development continue to use the direct Anthropic client. The function runs **outside a VPC** deliberately, since a VPC-attached Lambda needs a NAT Gateway (roughly $32/month) to reach Neon, Pinecone, OpenAI, and Bedrock. Conversation memory is the same Neon Postgres the Streamlit deployment uses, so a `thread_id` is durable across both surfaces.
 
-Cold starts are significant, since the init phase imports LangChain, boto3, and psycopg, and API Gateway caps integration timeouts at 30 seconds; the practical effect is that a first request after an idle period can time out while the container finishes warming, and a retry succeeds. Warm latency is about 51ms for `/health` and about 9s for `/query`. The measurements, the rejected alternatives, and the two failures that appeared only once deployed are in [`docs/architecture.md`](docs/architecture.md#aws-deploy-container-image-lambda-behind-api-gateway-inference-on-bedrock).
+Cold starts have two regimes, and the variable is whether Lambda has already cached the container image, not how long the function sat idle. The first invocation after a new image is pushed has to fetch and unpack that image inside the init phase, which blows Lambda's hard 10s init cap and re-runs initialization inside the invoke, for a cold `/health` of 23–24s. Once the image is cached, init runs 5.5–6.4s for a cold `/health` of 6.5–7.7s, and that number is flat from five minutes of idle out to 16.3 hours. API Gateway caps its integration timeout at 30 seconds, so only the post-push regime can return a 504 while the function runs to completion and stays warm; the demo protocol is therefore to call `/health` first, then `/query`. Warm latency is about 51ms for `/health` and about 9s for `/query`. The measurements, the rejected alternatives, and the two failures that appeared only once deployed are in [`docs/architecture.md`](docs/architecture.md#aws-deploy-container-image-lambda-behind-api-gateway-inference-on-bedrock).
 
 **Environment variables** (injected at runtime, never baked into the image; API keys via `env_file: .env`, `DATABASE_URL` set in the Compose `environment:` block for the local stack):
 
@@ -187,7 +192,7 @@ Cold starts are significant, since the init phase imports LangChain, boto3, and 
 | `DATABASE_URL` | Postgres connection string, e.g. `postgresql://civ:civ@db:5432/civ` |
 | `APP_PASSWORD` | Password gate for the Streamlit UI |
 
-Secrets are excluded from the image via `.dockerignore`. When `DATABASE_URL` is not set, the app falls back to an in-memory `MemorySaver` checkpointer automatically; this is the case for local development without Postgres. The hosted Streamlit Community Cloud deployment sets `DATABASE_URL` to an external managed Postgres (Neon) via a Cloud secret, so it runs durable `PostgresSaver` rather than the fallback.
+Secrets are excluded from the image via `.dockerignore`. When `DATABASE_URL` is not set, or is set but cannot be reached, the app falls back to an in-memory `MemorySaver` checkpointer automatically and logs the fallback; the unset case is local development without Postgres. The hosted Streamlit Community Cloud deployment sets `DATABASE_URL` to an external managed Postgres (Neon) via a Cloud secret, so it runs durable `PostgresSaver` rather than the fallback.
 
 ---
 
