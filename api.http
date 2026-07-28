@@ -1,0 +1,46 @@
+# civ-rag API requests
+#
+# Requires the REST Client extension (humao.rest-client). Click "Send Request"
+# above any request below.
+#
+# The API key is read from .env (gitignored), so nothing secret lives in this
+# file and it is safe to commit.
+#
+# Cost note: /health is free of model tokens and is the safe one to hammer.
+# /query spends Bedrock tokens on every call, so use it deliberately.
+#
+# Cold start: the first call after an image push can take ~23s and API Gateway
+# gives up at 30s. Call /health first to warm the container, then /query.
+
+@aws = https://uijw31ulv5.execute-api.us-east-1.amazonaws.com
+@local = http://localhost:8000
+
+### AWS health check
+GET {{aws}}/health
+
+### AWS query (spends Bedrock tokens)
+POST {{aws}}/query
+Content-Type: application/json
+X-API-Key: {{$dotenv API_SHARED_SECRET}}
+
+{
+  "query": "What does the Eagle Warrior do?",
+  "thread_id": "smoke-test",
+  "history": []
+}
+
+### Local health check
+# Start the service first:
+#   uv run --extra api uvicorn src.api:app --port 8000
+GET {{local}}/health
+
+### Local query
+POST {{local}}/query
+Content-Type: application/json
+X-API-Key: {{$dotenv API_SHARED_SECRET}}
+
+{
+  "query": "What does the Eagle Warrior do?",
+  "thread_id": "smoke-test",
+  "history": []
+}
