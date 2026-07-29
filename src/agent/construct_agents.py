@@ -67,11 +67,27 @@ def build_checkpointer():
         # blocks on the default 30s borrow timeout. 10s is generous enough for a
         # cold Neon free-tier compute to wake and accept the first connection;
         # connect_timeout bounds each individual libpq attempt.
+        # check= validates a pooled connection before handing it out. Without
+        # it the pool returns whatever it parked, and the CALLER eats the error
+        # on a dead connection; the pool only logs "discarding closed
+        # connection" afterward, so the next query succeeds and the failure
+        # looks intermittent. Neon's free tier autosuspends its compute after
+        # ~5 minutes idle, which kills exactly the connection min_size=1 keeps
+        # parked, so any gap between queries reproduces this. Observed in prod
+        # 2026-07-29: a clean query at 16:42 UTC, ~20 minutes idle, then a
+        # psycopg [BAD] connection surfaced to the user on the next one.
+        # Cost of the check is one round trip on borrow; a dead connection is
+        # discarded and replaced transparently instead of raising.
+        #
+        # NOTE: max_idle would NOT help here. It only reaps connections ABOVE
+        # min_size, and the parked connection at min_size=1 is the one Neon
+        # kills.
         pool = ConnectionPool(
             db_uri,
             min_size=1,
             max_size=5,
             open=False,
+            check=ConnectionPool.check_connection,
             kwargs={
                 "autocommit": True,
                 "row_factory": dict_row,
