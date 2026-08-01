@@ -143,7 +143,7 @@ Three things had been conflated under one label: a tool-routing bug, the probe t
 
 **A cold start blamed on the wrong thing.** Slow first requests were attributed to the database endpoint and to Neon being cold. Measurement showed the variable is **image-cache state** — flat latency from five minutes to 16.3 hours of idle rules out idle time entirely, and the 16.3-hour measurement came back at the *fast* end of the band.
 
-### The fix that silently removed a guarantee
+### The fix that removed a guarantee, with nothing to show it had
 
 Moving construction into a container-lifetime singleton required `min_size=0`, so an idle warm container would park no database connection. That worked. It also removed the fail-fast bound on a bad `DATABASE_URL` without any signal.
 
