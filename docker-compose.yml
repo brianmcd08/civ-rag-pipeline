@@ -1,6 +1,10 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      # Explicit target is REQUIRED now that the Dockerfile is multi-stage: a
+      # build with no target produces the LAST stage, which is `api`.
+      target: app
     ports:
       - "8501:8501"
     env_file: .env
@@ -9,6 +13,31 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  api:
+    build:
+      context: .
+      target: api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://civ:civ@db:5432/civ
+      # Local runs go straight to Anthropic; Bedrock is the Lambda path only.
+      LLM_PROVIDER: anthropic
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # The slim image has no curl, and the venv's python is not on PATH, so
+      # call it by absolute path. start_period covers LangChain/Pinecone import
+      # time, which is slow enough to fail an unguarded first check.
+      test: ["CMD", "/app/.venv/bin/python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   db:
     image: postgres:16
