@@ -76,9 +76,19 @@ eval = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 
+# Pylance/pyright resolve imports from here regardless of which interpreter is
+# selected in the VS Code UI, which is what makes this durable:
+# python.defaultInterpreterPath is only a default and is ignored once a
+# workspace interpreter has been explicitly picked.
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "ruff>=0.15.16",
 ]
 
 [tool.ruff]
