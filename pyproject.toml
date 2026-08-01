@@ -4,10 +4,20 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-# Shared core: imported by all three paths (serve / ingest / eval) via
-# config, retriever, secrets, and logging_config. Kept minimal so the serve
-# extra stays the only thing governing deployed-image size.
-dependencies = [
+# Deliberately EMPTY. Everything moved into the `pipeline` extra below so the
+# Streamlit frontend can be a genuinely thin client: a bare install pulls in
+# nothing, and each surface asks for exactly the extra it needs. A bare
+# `uv sync` now produces an empty environment, so every install command must
+# name an extra (all of them already do: Dockerfile `--extra serve`,
+# Dockerfile.lambda `--extra api`, requirements.txt `.[serve]`, README's
+# `--extra ingest` / `--all-extras`).
+dependencies = []
+
+[project.optional-dependencies]
+# The retrieval/LLM core: config, retriever, secrets, logging_config. Was the
+# unconditional [project] dependencies block until the 2026-08-01 consolidation.
+# Depended on by serve-core, ingest, and (transitively) api and eval.
+pipeline = [
     "langchain>=1.3.4",
     "langchain-anthropic>=1.4.1",
     "langchain-openai>=1.1.14",
@@ -16,22 +26,27 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "structlog>=26.1.0",
 ]
-
-[project.optional-dependencies]
 # Shared serving stack: the agent runtime + Postgres-backed checkpointer with a
-# connection pool. Imported by construct_agents.py, so BOTH client extras below
-# (serve = Streamlit, api = FastAPI) depend on it. Neither client's deps leak
-# into the other.
+# connection pool. Imported by construct_agents.py. The `api` extra depends on
+# it; `serve` does too for now, but Step 5 of the consolidation drops that once
+# app.py stops importing src.response_generator.
 serve-core = [
+    "civilization-chatbot[pipeline]",
     "langgraph>=1.2.3",
     "langgraph-checkpoint-postgres>=3.1.0",
     "psycopg[binary]>=3.3.4",
     "psycopg-pool>=3.3.1",
 ]
-# Streamlit client (one front-end over serve-core).
+# Streamlit client. TEMPORARY serve-core reference: app.py still imports
+# src.response_generator until Step 5, and dropping serve-core here would break
+# the Streamlit surface for three steps. Step 5 deletes that line as its last
+# edit, leaving streamlit + httpx + dotenv only. httpx is the API client
+# transport (Timeout(connect=, read=) split, reusable Client with base_url).
 serve = [
     "civilization-chatbot[serve-core]",
     "streamlit>=1.56.0",
+    "httpx>=0.28.1",
+    "python-dotenv>=1.2.2",
 ]
 # FastAPI client (the deployed API; step 3 wraps this in a container-image
 # Lambda and adds Mangum). Deliberately excludes Streamlit.
@@ -43,7 +58,10 @@ api = [
     "uvicorn[standard]>=0.51.0",
 ]
 # Scrape + embed + upsert to Pinecone. Runs locally on demand, never deployed.
+# Needs an explicit `pipeline` reference now that the base block is empty: the
+# ingester imports config/retriever/logging_config, which it used to get for free.
 ingest = [
+    "civilization-chatbot[pipeline]",
     "beautifulsoup4>=4.14.3",
     "langchain-community>=0.4.2",
     "requests>=2.33.1",
