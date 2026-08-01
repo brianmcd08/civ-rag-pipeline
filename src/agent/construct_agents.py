@@ -1,21 +1,20 @@
 import os
 import threading
 
-from psycopg.rows import dict_row
-from psycopg_pool import ConnectionPool
 from langchain.agents import create_agent
 from langgraph.checkpoint.postgres import PostgresSaver
-from langgraph.checkpoint.memory import MemorySaver
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
-from src.config import llm
 from src.agent.tools import (
     search_buildings_and_improvements,
     search_general,
-    search_leaders,
     search_great_people,
+    search_leaders,
     search_techs_and_civics,
     search_units,
 )
+from src.config import llm
 from src.logging_config import logger
 
 tool_list = [
@@ -41,19 +40,30 @@ make up information or use information outside of the tools.
 
 
 def build_checkpointer():
-    """Build the conversation checkpointer.
+    """Build the conversation checkpointer. Postgres or nothing.
 
-    Returns ``(checkpointer, pool)``. When ``DATABASE_URL`` is set we back the
-    checkpointer with a psycopg ``ConnectionPool`` so concurrent requests each
-    borrow their own connection; ``pool`` is handed back so a caller that owns
-    the lifecycle (FastAPI's lifespan) can ``.close()`` it on shutdown. When no
-    database is configured, or connecting fails, we fall back to an in-process
-    ``MemorySaver`` and return ``pool=None``.
+    Returns ``(checkpointer, pool)``, backed by a psycopg ``ConnectionPool`` so
+    concurrent requests each borrow their own connection; ``pool`` is handed
+    back so a caller that owns the lifecycle (FastAPI's lifespan) can
+    ``.close()`` it on shutdown.
+
+    There is deliberately NO in-memory fallback. The old code dropped to a
+    ``MemorySaver`` when ``DATABASE_URL`` was unset or the connection failed,
+    which meant a dead database presented as a healthy app that had silently
+    stopped persisting anything: conversations vanished between requests and
+    the only signal was a log line nobody was reading. Failing to start is the
+    correct behavior for a service whose whole job is durable conversation
+    state. Callers that genuinely do not need persistence (tests, the eval
+    runner) pass ``checkpointer=None`` to ``build_agent`` instead of relying on
+    a fallback here.
     """
     db_uri = os.getenv("DATABASE_URL")
     if not db_uri:
-        logger.info("MemorySaver is ready")
-        return MemorySaver(), None
+        raise RuntimeError(
+            "DATABASE_URL is not set. The agent requires a Postgres "
+            "checkpointer. Set DATABASE_URL, or call build_agent(None) if you "
+            "genuinely want a stateless agent (tests and the eval runner do)."
+        )
 
     pool = None
     try:
@@ -62,9 +72,10 @@ def build_checkpointer():
         # connections is plenty and stays well under Neon's free-tier ceiling.
         #
         # open=False + pool.open(wait=True, timeout=10) makes a bad/unreachable
-        # DB fail fast (bounded ~10s) into the MemorySaver fallback below,
-        # instead of the pool silently retrying in the background while setup()
-        # blocks on the default 30s borrow timeout. 10s is generous enough for a
+        # DB fail fast (bounded ~10s) and raise, instead of the pool retrying in
+        # the background while setup() blocks on the default 30s borrow timeout.
+        # (This used to fall through to a MemorySaver; it now propagates.)
+        # 10s is generous enough for a
         # cold Neon free-tier compute to wake and accept the first connection;
         # connect_timeout bounds each individual libpq attempt.
         # check= validates a pooled connection before handing it out. Without
@@ -103,13 +114,12 @@ def build_checkpointer():
         logger.info("PostgresSaver is ready")
         return checkpointer, pool
     except Exception as e:
-        logger.exception(
-            f"{str(e)}. Error connecting to the Postgres db. Falling back to MemorySaver"
-        )
+        logger.exception(f"{str(e)}. Error connecting to the Postgres db.")
         if pool is not None:
             pool.close()
-        logger.info("MemorySaver is ready")
-        return MemorySaver(), None
+        # Re-raise rather than degrade. See the docstring: a silent fallback
+        # here is what let a dead database look like a working app.
+        raise
 
 
 def build_agent(checkpointer):
@@ -120,23 +130,41 @@ def build_agent(checkpointer):
 
 
 _agent = None
+_pool = None
 _agent_lock = threading.Lock()
 
 
 def get_agent():
-    """Lazily build and cache a process-wide agent (Streamlit / eval / tests).
+    """Lazily build and cache a process-wide agent.
 
-    Importing this module now has no side effects; the agent is built on first
-    call and reused thereafter. The lock closes the first-call race: Streamlit
-    runs each session in its own thread, so two concurrent first queries could
-    otherwise both see ``_agent is None`` and each open a ConnectionPool,
-    leaking the loser's pool. The FastAPI service deliberately does NOT use
-    this — it builds its own agent inside the lifespan so it can own the pool's
-    lifecycle and close it on shutdown.
+    Importing this module has no side effects; the agent is built on first call
+    and reused thereafter. The lock closes the first-call race: two concurrent
+    first queries could otherwise both see ``_agent is None`` and each open a
+    ConnectionPool, leaking the loser's pool.
+
+    The pool is kept in a module global rather than discarded, so
+    ``close_agent()`` can release it on shutdown. Previously it was dropped on
+    the floor here, which meant the only way to free those connections was to
+    end the process.
     """
-    global _agent
+    global _agent, _pool
     with _agent_lock:
         if _agent is None:
-            checkpointer, _ = build_checkpointer()
+            checkpointer, pool = build_checkpointer()
             _agent = build_agent(checkpointer)
+            _pool = pool
     return _agent
+
+
+def close_agent():
+    """Release the process-wide agent's connection pool.
+
+    Only meaningful for long-lived local processes (a Ctrl-C'd uvicorn). Lambda
+    never runs it: the execution environment is destroyed wholesale.
+    """
+    global _agent, _pool
+    with _agent_lock:
+        if _pool is not None:
+            _pool.close()
+        _pool = None
+        _agent = None

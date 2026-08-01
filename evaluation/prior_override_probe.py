@@ -14,6 +14,9 @@ compare models (e.g. Haiku vs. Sonnet) and re-run.
 import sys
 from uuid import uuid4
 
+from langgraph.checkpoint.memory import MemorySaver
+
+from src.agent.construct_agents import build_agent
 from src.config import ANTHROPIC_MODEL
 from src.response_generator import generate_response
 
@@ -35,6 +38,12 @@ def classify(answer: str) -> str:
 
 
 def main() -> None:
+    # Needs memory: the challenge turn reuses turn 1's thread_id, and whether
+    # the model holds its prior answer is the entire question. Injected
+    # explicitly rather than reached through get_agent(), which now requires a
+    # real Postgres.
+    agent = build_agent(MemorySaver())
+
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 10
     print(f"model: {ANTHROPIC_MODEL}")
     print(f"runs:  {n}\n")
@@ -45,7 +54,7 @@ def main() -> None:
     for i in range(1, n + 1):
         thread_id = str(uuid4())
 
-        answer, _ = generate_response(QUESTION, [], thread_id)
+        answer, _ = generate_response(QUESTION, [], thread_id, agent=agent)
         first = classify(answer)
         initial_counts[first] = initial_counts.get(first, 0) + 1
 
@@ -53,7 +62,7 @@ def main() -> None:
             {"role": "user", "content": QUESTION},
             {"role": "assistant", "content": answer},
         ]
-        followup, _ = generate_response(CHALLENGE, history, thread_id)
+        followup, _ = generate_response(CHALLENGE, history, thread_id, agent=agent)
         second = classify(followup)
         challenge_counts[second] = challenge_counts.get(second, 0) + 1
 
