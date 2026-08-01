@@ -6,17 +6,26 @@
 # The API key is read from .env (gitignored), so nothing secret lives in this
 # file and it is safe to commit.
 #
-# Cost note: /health is free of model tokens and is the safe one to hammer.
+# Cost note: /health and /warm are both free of model tokens. /health is the
+# safe one to hammer; /warm opens a Neon connection, so it is key-gated.
 # /query spends Bedrock tokens on every call, so use it deliberately.
 #
 # Cold start: the first call after an image push can take ~23s and API Gateway
-# gives up at 30s. Call /health first to warm the container, then /query.
+# gives up at 30s. Call /warm first, then /query. NOTE this changed: /health no
+# longer warms anything. Agent construction moved out of the FastAPI lifespan
+# into the get_agent() singleton, which made /health genuinely dependency-free
+# (correct for a liveness probe) and left /warm as the only route that builds
+# the agent and wakes the database.
 
 @aws = https://uijw31ulv5.execute-api.us-east-1.amazonaws.com
 @local = http://localhost:8000
 
-### AWS health check
+### AWS health check (dependency-free; does NOT warm)
 GET {{aws}}/health
+
+### AWS warm (builds the agent, wakes Neon, no Bedrock tokens)
+POST {{aws}}/warm
+X-API-Key: {{$dotenv API_SHARED_SECRET}}
 
 ### AWS query (spends Bedrock tokens)
 POST {{aws}}/query
@@ -29,10 +38,14 @@ X-API-Key: {{$dotenv API_SHARED_SECRET}}
   "history": []
 }
 
-### Local health check
+### Local health check (dependency-free; does NOT warm)
 # Start the service first:
 #   uv run --extra api uvicorn src.api:app --port 8000
 GET {{local}}/health
+
+### Local warm (builds the agent, no Bedrock tokens)
+POST {{local}}/warm
+X-API-Key: {{$dotenv API_SHARED_SECRET}}
 
 ### Local query
 POST {{local}}/query

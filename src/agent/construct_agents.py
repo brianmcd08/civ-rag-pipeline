@@ -67,37 +67,51 @@ def build_checkpointer():
 
     pool = None
     try:
-        # min/max kept small on purpose: the deployed target is one request per
-        # container (Lambda) and the demo is low-traffic, so a handful of
-        # connections is plenty and stays well under Neon's free-tier ceiling.
+        # min_size=0 is deliberate and is what makes construction reuse safe on
+        # Lambda. Now that the agent is built once per CONTAINER rather than per
+        # invocation, a warm container sits idle between requests holding
+        # whatever the pool parked. At min_size=1 that parked connection would
+        # keep Neon's compute awake (or, worse, be the exact connection Neon
+        # kills on autosuspend). At 0 the pool parks nothing, autosuspend works
+        # normally, and connections are opened on demand. This was the one
+        # objection that previously argued against reusing construction at all;
+        # min_size=0 removes it. max_size stays small: one request per container
+        # on Lambda, low-traffic demo, well under Neon's free-tier ceiling.
         #
-        # open=False + pool.open(wait=True, timeout=10) makes a bad/unreachable
-        # DB fail fast (bounded ~10s) and raise, instead of the pool retrying in
-        # the background while setup() blocks on the default 30s borrow timeout.
-        # (This used to fall through to a MemorySaver; it now propagates.)
-        # 10s is generous enough for a
-        # cold Neon free-tier compute to wake and accept the first connection;
-        # connect_timeout bounds each individual libpq attempt.
+        # open=False + pool.open(wait=True, timeout=10) USED to be the fail-fast
+        # on a bad/unreachable DB. min_size=0 breaks that: open(wait=True)
+        # returns immediately because there is nothing to pre-open, so the 10s
+        # bound never applies and the first real need for a connection is
+        # PostgresSaver.setup() below.
+        #
+        # timeout=10 is what restores the bound, and it is not optional here.
+        # It sets the pool's default borrow timeout; without it getconn falls
+        # back to psycopg_pool's 30s default. Measured 2026-08-01 against a
+        # refused DATABASE_URL: "couldn't get a connection after 30.00 sec".
+        # That is a real regression on Lambda, where API Gateway's integration
+        # timeout is a hard 30s — a bad URL would race the gateway and surface
+        # as an ambiguous 504 instead of a diagnosable 500. At 10s the error
+        # comes back with room to spare and setup() is what raises it, through
+        # the same except branch as before. connect_timeout still bounds each
+        # individual libpq attempt underneath.
+        #
         # check= validates a pooled connection before handing it out. Without
         # it the pool returns whatever it parked, and the CALLER eats the error
         # on a dead connection; the pool only logs "discarding closed
         # connection" afterward, so the next query succeeds and the failure
-        # looks intermittent. Neon's free tier autosuspends its compute after
-        # ~5 minutes idle, which kills exactly the connection min_size=1 keeps
-        # parked, so any gap between queries reproduces this. Observed in prod
-        # 2026-07-29: a clean query at 16:42 UTC, ~20 minutes idle, then a
-        # psycopg [BAD] connection surfaced to the user on the next one.
-        # Cost of the check is one round trip on borrow; a dead connection is
-        # discarded and replaced transparently instead of raising.
-        #
-        # NOTE: max_idle would NOT help here. It only reaps connections ABOVE
-        # min_size, and the parked connection at min_size=1 is the one Neon
-        # kills.
+        # looks intermittent. Observed in prod 2026-07-29: a clean query at
+        # 16:42 UTC, ~20 minutes idle, then a psycopg [BAD] connection surfaced
+        # to the user on the next one. This matters MORE under construction
+        # reuse, not less: a container can be frozen and thawed arbitrarily long
+        # between invocations, so a connection opened on one request can be dead
+        # by the next even with nothing parked at idle. Cost is one round trip
+        # on borrow; a dead connection is discarded and replaced transparently.
         pool = ConnectionPool(
             db_uri,
-            min_size=1,
+            min_size=0,
             max_size=5,
             open=False,
+            timeout=10,
             check=ConnectionPool.check_connection,
             kwargs={
                 "autocommit": True,
