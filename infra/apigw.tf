@@ -43,9 +43,18 @@ resource "aws_apigatewayv2_stage" "default" {
   # than the only one. Kept low anyway: it caps how fast an unauthenticated
   # caller can burn Lambda invocations on 401s, which the app-level check
   # cannot prevent (the function still has to run to reject the request).
+  #
+  # Burst raised 2 -> 5 on 2026-08-01, before the Streamlit Cloud cutover.
+  # After that cutover a single user's session opens with POST /warm followed
+  # by their first POST /query, which is 2 requests back to back and exactly
+  # the old burst ceiling. Two people opening the demo at the same time would
+  # have hit 429s on a link handed to an interviewer. The rate limit stays at
+  # 1 rps because sustained throughput is not the thing that needed headroom;
+  # only the momentary burst at session start did. The shared secret, not this,
+  # is what actually caps cost now.
   default_route_settings {
     throttling_rate_limit  = 1
-    throttling_burst_limit = 2
+    throttling_burst_limit = 5
   }
 }
 
