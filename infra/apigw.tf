@@ -22,6 +22,18 @@ resource "aws_apigatewayv2_route" "query" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
+# Builds the agent and opens Neon without spending Bedrock tokens. /health can
+# no longer do this: construction moved out of the FastAPI lifespan and into the
+# get_agent() singleton, which made /health genuinely dependency-free and
+# therefore useless as a warm-up. The Streamlit client pings this once per
+# authenticated session so the first real question does not pay cold-start plus
+# construction against API Gateway's hard 30s integration timeout.
+resource "aws_apigatewayv2_route" "warm" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /warm"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.http.id
   name        = "$default"

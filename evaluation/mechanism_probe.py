@@ -9,14 +9,13 @@ turns and counts tool calls added on the challenge turn.
 
 from uuid import uuid4
 
-from langchain_core.messages import ToolMessage, AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.memory import MemorySaver
 
+from src.agent.construct_agents import build_agent
 from src.config import ANTHROPIC_MODEL, RECURSION_LIMIT
 from src.retrieval import version_extractor as ve
-from src.agent.construct_agents import get_agent
-
-agent = get_agent()
 
 QUESTION = "What is the Aztec unique unit in version 7.5?"
 CHALLENGE = "Are you sure?"
@@ -31,7 +30,7 @@ def count_tool_calls(messages) -> list:
     return calls
 
 
-def invoke(query, history, thread_id):
+def invoke(agent, query, history, thread_id):
     parsed = ve.query_parser(query, history)
     message = parsed.cleaned_query
     if parsed.version:
@@ -47,10 +46,18 @@ def invoke(query, history, thread_id):
 
 
 def main():
+    # This probe is one of only two that genuinely need memory: the challenge
+    # turn reuses turn 1's thread_id and the whole question is what carried
+    # over. MemorySaver is injected explicitly rather than reached through
+    # get_agent(), which now requires a real Postgres.
+    # Built inside main() rather than at module scope so importing this module
+    # has no side effects.
+    agent = build_agent(MemorySaver())
+
     print(f"model: {ANTHROPIC_MODEL}\n")
     tid = str(uuid4())
 
-    parsed1, msgs1 = invoke(QUESTION, [], tid)
+    parsed1, msgs1 = invoke(agent, QUESTION, [], tid)
     print(f"TURN 1 query='{QUESTION}'  cleaned='{parsed1.cleaned_query}' version={parsed1.version}")
     calls1 = count_tool_calls(msgs1)
     print(f"  tool calls this state: {calls1}")
@@ -62,7 +69,7 @@ def main():
         {"role": "user", "content": QUESTION},
         {"role": "assistant", "content": msgs1[-1].text},
     ]
-    parsed2, msgs2 = invoke(CHALLENGE, history, tid)
+    parsed2, msgs2 = invoke(agent, CHALLENGE, history, tid)
     print(f"TURN 2 query='{CHALLENGE}'  cleaned='{parsed2.cleaned_query}' version={parsed2.version}")
     calls2 = count_tool_calls(msgs2)
     print(f"  cumulative tool calls in state: {calls2}")

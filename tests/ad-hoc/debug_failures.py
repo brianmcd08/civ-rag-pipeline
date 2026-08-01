@@ -1,5 +1,7 @@
 # Ad-hoc script to debug the 5 retrieval failures identified in the baseline eval.
 # Run during v1 development to diagnose version_extractor routing problems.
+from uuid import uuid4
+
 from src.response_generator import generate_response
 
 failing_questions = [
@@ -9,7 +11,9 @@ failing_questions = [
 
 for q in failing_questions:
     print(f"\nQ: {q}")
-    answer = generate_response(q, [], "")
+    # A real id, not "": an empty string is falsy inside LangGraph's config
+    # resolution.
+    answer = generate_response(q, [], str(uuid4()))
     print(f"  → Answer: {answer}")
     # docs = rag_pipeline(q, [])
     # print(f"  → {len(docs)} docs returned")

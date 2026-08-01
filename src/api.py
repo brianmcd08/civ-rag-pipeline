@@ -2,12 +2,12 @@ from contextlib import asynccontextmanager
 from secrets import compare_digest
 from typing import Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
+from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 from mangum import Mangum
 from pydantic import BaseModel
 
-from src.agent.construct_agents import build_agent, build_checkpointer
+from src.agent.construct_agents import close_agent, get_agent
 from src.config import API_KEY_HEADER_NAME
 from src.response_generator import generate_response
 from src.secrets import get_secret
@@ -62,34 +62,50 @@ class QueryResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app):
-    # startup
-    checkpointer, pool = build_checkpointer()
-    try:
-        app.state.agent = build_agent(checkpointer)
-    except Exception:
-        # Startup is aborting before yield, so the shutdown branch below
-        # would never run; close the just-opened pool instead of leaking it,
-        # then let the failure propagate so the app still refuses to start.
-        if pool is not None:
-            pool.close()
-        raise
+    """Shutdown only. Construction happens in get_agent(), not here.
 
+    The startup half used to build the checkpointer and agent and stash them on
+    app.state. That was correct for a long-lived uvicorn and wrong for Lambda:
+    Mangum runs the lifespan per INVOCATION, not per container, so every single
+    request opened a ConnectionPool, ran PostgresSaver.setup(), built the agent,
+    and closed the pool again. Verified two ways in 2026-07-24 — Mangum's
+    adapter wraps each request's HTTPCycle in a LifespanCycle under the default
+    lifespan="auto", and CloudWatch logged "PostgresSaver is ready" on every
+    invocation including six consecutive warm /health calls.
+
+    Moving construction into the lazy get_agent() singleton fixes that AND
+    collapses the two construction paths this refactor exists to remove: every
+    surface (Streamlit's client, uvicorn, Lambda) now builds the agent exactly
+    one way. The handler below sets lifespan="off" so Mangum stops running this
+    at all; Lambda destroys the execution environment wholesale, so there is
+    nothing to clean up there anyway.
+
+    What remains is for local runs: a Ctrl-C'd uvicorn should release its Neon
+    connections rather than leave them to server-side timeout.
+    """
     yield
-
-    # shutdown
-    if pool is not None:
-        pool.close()
+    close_agent()
 
 
 app = FastAPI(lifespan=lifespan)
 
 
-# Deliberately left open: it costs a Lambda invoke but no Bedrock tokens, and
-# it is the "yes, this is really running" proof that can be handed out without
-# handing out the key.
+# Deliberately left open, and now genuinely dependency-free: with construction
+# out of the lifespan this touches nothing but the event loop, which is what a
+# liveness probe should be. The tradeoff is that pinging it no longer wakes Neon
+# or builds the agent, so it is no longer a warm-up. That is what /warm is for.
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# Key-gated even though it spends no model tokens, because it does open a Neon
+# connection and run setup(). Left open it would let an anonymous caller drive
+# database wake-ups against a 1 rps throttle.
+@app.post("/warm", dependencies=[Depends(require_api_key)])
+def warm():
+    get_agent()
+    return {"status": "warm"}
 
 
 @app.post(
@@ -97,14 +113,18 @@ def health():
     response_model=QueryResponse,
     dependencies=[Depends(require_api_key)],
 )
-def query(req: QueryRequest, request: Request):
+def query(req: QueryRequest):
     answer, documents = generate_response(
         req.query,
         [m.model_dump() for m in req.history],
         req.thread_id,
-        agent=request.app.state.agent,
+        agent=get_agent(),
     )
     return QueryResponse(response=answer, documents=documents)
 
 
-handler = Mangum(app)
+# lifespan="off" is the half of this change that actually saves the work. Without
+# it Mangum would keep running the (now shutdown-only) lifespan per invocation,
+# which would call close_agent() after every request and throw away the very
+# singleton this step exists to reuse.
+handler = Mangum(app, lifespan="off")

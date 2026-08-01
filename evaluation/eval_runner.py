@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from evaluation.answer_relevance import answer_relevance_judge
 from evaluation.context_relevance_judge import context_relevance_judge
 from evaluation.grounding import grounding_judge
+from src.agent.construct_agents import build_agent
 from src.response_generator import generate_response
 
 load_dotenv()
@@ -18,7 +19,7 @@ def parse_eval_file(filepath: str) -> list:
     results = []
 
     # get all lines
-    with open(filepath, "r") as file:
+    with open(filepath) as file:
         lines: list = []
         lines = file.readlines()
         line_number = 0
@@ -62,13 +63,21 @@ fieldnames = [
 
 
 async def main():
+    # Every eval question is single-turn with history=[], so persistence is
+    # not under test and a database would be pure overhead. Build a stateless
+    # agent explicitly rather than letting generate_response fall through to
+    # get_agent(), which now requires DATABASE_URL.
+    agent = build_agent(None)
+
     with open("evaluation/judgment.csv", "w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for item in items:
             query = item["question"]
             ideal_answer = item["ideal_answer"]
-            response, documents = generate_response(query, [], str(uuid4()))
+            response, documents = generate_response(
+                query, [], str(uuid4()), agent=agent
+            )
 
             context_result, grounding_result, answer_result = await asyncio.gather(
                 context_relevance_judge(documents, query),
