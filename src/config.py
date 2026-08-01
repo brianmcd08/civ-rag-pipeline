@@ -1,49 +1,18 @@
 import os
-from enum import StrEnum
 
+from src.constants import (  # noqa: F401  (re-exported for existing import sites)
+    API_KEY_HEADER_NAME,
+    CHUNK_CONTENT_LIMIT,
+    HISTORY_LIMIT,
+    RECURSION_LIMIT,
+    Section,
+    Version,
+)
 from src.secrets import get_secret
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")
 if LLM_PROVIDER != "bedrock":
     os.environ["ANTHROPIC_API_KEY"] = get_secret("ANTHROPIC_API_KEY")
-
-
-class Version(StrEnum):
-    V75 = "7.5"
-    V74 = "7.4"
-    V73 = "7.3"
-    V72 = "7.2"
-    V71 = "7.1"
-    VBASE = "base_game"
-
-    @classmethod
-    def to_list_of_strings(cls):
-        return "\n".join([v.value for v in cls])
-
-    @classmethod
-    def get_latest_version(cls):
-        return next(iter(cls))
-
-
-class Section(StrEnum):
-    LEADERS = "leaders"
-    GREATPEOPLE = "great_people"
-    MISC = "misc"
-    CONGRESS = "congress"
-    IMPROVEMENTS = "improvements"
-    UNITS = "units"
-    BUILDINGS = "buildings"
-    CHANGELOG = "changelog"
-    CITYSTATES = "city_states"
-    GOVERNORS = "governor"
-    BBGEXPANDED = "bbg_expanded"
-    NAMES = "names"
-    NATURALWONDER = "natural_wonder"
-    POLICIES = "policies"
-    RELIGION = "religion"
-    TECHTREE = "tech_tree"
-    CIVICTREE = "civic_tree"
-    WORLDWONDER = "world_wonder"
 
 
 # LLM
@@ -70,11 +39,9 @@ INDEX_CLOUD = "aws"
 INDEX_METRIC = "dotproduct"
 INDEX_REGION = "us-east-1"
 
-# App
-API_KEY_HEADER_NAME = "X-API-Key"
-HISTORY_LIMIT = 4
-RECURSION_LIMIT = 25
-CHUNK_CONTENT_LIMIT = 1500
+# App constants (API_KEY_HEADER_NAME, HISTORY_LIMIT, RECURSION_LIMIT,
+# CHUNK_CONTENT_LIMIT) and the Version/Section enums now live in
+# src/constants.py and are re-exported by the import at the top of this file.
 
 
 if LLM_PROVIDER == "bedrock":
