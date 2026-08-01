@@ -7,11 +7,17 @@ services:
       target: app
     ports:
       - "8501:8501"
-    env_file: .env
+    # Explicit environment, NOT env_file. env_file injected Anthropic, OpenAI
+    # and Pinecone keys into the frontend container, which is exactly the
+    # credential surface this consolidation exists to shrink. The frontend now
+    # needs three values and holds no model or database credentials.
+    # DATABASE_URL is deliberately absent: there is no psycopg in this image.
     environment:
-      DATABASE_URL: postgresql://civ:civ@db:5432/civ
+      APP_PASSWORD: ${APP_PASSWORD}
+      API_SHARED_SECRET: ${API_SHARED_SECRET}
+      API_BASE_URL: http://api:8000
     depends_on:
-      db:
+      api:
         condition: service_healthy
 
   api:

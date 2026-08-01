@@ -37,13 +37,12 @@ serve-core = [
     "psycopg[binary]>=3.3.4",
     "psycopg-pool>=3.3.1",
 ]
-# Streamlit client. TEMPORARY serve-core reference: app.py still imports
-# src.response_generator until Step 5, and dropping serve-core here would break
-# the Streamlit surface for three steps. Step 5 deletes that line as its last
-# edit, leaving streamlit + httpx + dotenv only. httpx is the API client
-# transport (Timeout(connect=, read=) split, reusable Client with base_url).
+# Streamlit client, now genuinely thin. serve-core was dropped 2026-08-01 once
+# app.py stopped importing src.response_generator and became an HTTP client of
+# the api surface. No langchain, langgraph, psycopg, pinecone or openai in the
+# frontend image, and no model or database credentials with them. httpx is the
+# API transport (Timeout(connect=, read=) split, reusable Client with base_url).
 serve = [
-    "civilization-chatbot[serve-core]",
     "streamlit>=1.56.0",
     "httpx>=0.28.1",
     "python-dotenv>=1.2.2",
