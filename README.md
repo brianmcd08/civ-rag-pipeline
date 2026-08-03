@@ -201,6 +201,22 @@ The suite spans the `serve` and `ingest` extras (integration tests hit both the 
 
 ---
 
+## Running the eval
+
+The eval scores a fixed 15-question set with three independent LLM judges (context relevance, groundedness, answer relevance) and writes per-question scores plus each judge's reasoning to `evaluation/judgment.csv`:
+
+```bash
+uv run --extra eval python -m evaluation.eval_runner
+```
+
+**Every run bills.** Each question costs a full agentic pipeline run (model calls, embeddings, Pinecone queries) plus three judge calls, so this is not a command to fire off casually. It needs `ANTHROPIC_API_KEY`: the judges call the Anthropic SDK directly rather than going through the pipeline's provider abstraction. `judgment.csv` is overwritten in place, so copy off any run worth keeping before starting another.
+
+The harness is local and offline, never deployed. It imports `generate_response` in-process instead of calling the HTTP API, so a run never touches API Gateway or Lambda. It also uses whatever `LLM_PROVIDER` resolves to locally, which is the direct Anthropic client rather than the Bedrock path the deployed Lambda takes. That is a deliberate cost decision, and worth stating plainly: **the eval measures the same model tier production runs, over a different transport.**
+
+Judge model and generation model are currently the same (`claude-sonnet-4-6`), which is a known limitation of the setup rather than a property of the scores. The preserved `evaluation/judgment_haiku_agentic_baseline.csv` is a cross-model reference point.
+
+---
+
 ## BBG versions covered
 
 `base_game`, `7.1`, `7.2`, `7.3`, `7.4`, `7.5`
