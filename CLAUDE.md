@@ -6,7 +6,7 @@ Python, LangGraph (create_react_agent), Pinecone hybrid search, Streamlit.
 
 ## Hard Rules
 - Never read, display, modify, or reference .env or any secrets file
-- Never run ingestion scripts (ingester.py) — Pinecone writes cost money
+- Never run ingestion scripts (ingester.py) — they write to the live Pinecone index
 - Never run the Streamlit app — use tests and eval runner only
 
 ## Commands
