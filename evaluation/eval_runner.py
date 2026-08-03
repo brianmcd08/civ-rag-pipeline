@@ -2,17 +2,15 @@ import asyncio
 import csv
 from uuid import uuid4
 
-import anthropic
 from dotenv import load_dotenv
 
-from evaluation.answer_relevance import answer_relevance_judge
+from evaluation.answer_relevance_judge import answer_relevance_judge
 from evaluation.context_relevance_judge import context_relevance_judge
-from evaluation.grounding import grounding_judge
+from evaluation.grounding_judge import grounding_judge
 from src.agent.construct_agents import build_agent
 from src.response_generator import generate_response
 
 load_dotenv()
-client = anthropic.Anthropic()
 
 
 def parse_eval_file(filepath: str) -> list:

@@ -5,7 +5,7 @@ from evaluation.schema import PartialJudgment
 from src.config import ANTHROPIC_JUDGE
 
 load_dotenv()
-client = anthropic.Anthropic()
+client = anthropic.AsyncAnthropic()
 
 context_relevance_prompt = """
     You are an impartial evaluator. Your job is to assess if the provided documents are relevant to the provided query and give your reasoning.
@@ -30,20 +30,22 @@ context_relevance_prompt = """
 async def context_relevance_judge(
     chunks: list[str], query: str
 ) -> PartialJudgment:
-    result = client.beta.messages.parse(
-        model=ANTHROPIC_JUDGE,
-        max_tokens=1024,
-        system=context_relevance_prompt,
-        messages=[
-            {
-                "role": "user",
-                "content": f"""
+    result = (
+        await client.beta.messages.parse(
+            model=ANTHROPIC_JUDGE,
+            max_tokens=1024,
+            system=context_relevance_prompt,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""
                 Question: {query}
                 Documents: {"\n\n".join(chunks)}
             """,
-            }
-        ],
-        output_format=PartialJudgment,
+                }
+            ],
+            output_format=PartialJudgment,
+        )
     ).parsed_output
 
     if result is None:

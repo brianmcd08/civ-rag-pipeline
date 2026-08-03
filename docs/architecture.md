@@ -71,7 +71,7 @@ The original eval compared responses against hand-written ideal answers on faith
 
 Giving groundedness the chunks directly fixes both problems at once. Low groundedness with high context relevance points at generation; low context relevance points at retrieval. That localization is the entire value.
 
-**A known defect:** the three judges are fired with `asyncio.gather` but **execute sequentially**. Each is an `async def` with no `await` inside, wrapping the synchronous `anthropic.Anthropic()` client, so each coroutine blocks the event loop for its full API call. Total judge time is the sum, not the max. Nothing errors or warns. The fix is `AsyncAnthropic` and a real `await`; it has not shipped.
+**A defect this document found in itself.** The three judges are fired with `asyncio.gather`, and for months they **executed sequentially**: each was an `async def` with no `await` inside, wrapping the synchronous `anthropic.Anthropic()` client, so every coroutine blocked the event loop for its full API call. Total judge time was the sum rather than the max, and nothing errored or warned — the structure of concurrency with none of it. It was caught by verifying this document against the code rather than by any test or metric, which is the point worth keeping: the failure mode is invisible to everything except reading the call. Fixed by swapping the three judge files to `AsyncAnthropic` with a real `await`.
 
 ### The checkpointer raises rather than falling back
 
