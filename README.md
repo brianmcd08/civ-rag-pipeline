@@ -203,17 +203,20 @@ The suite spans the `serve` and `ingest` extras (integration tests hit both the 
 
 ## Running the eval
 
-The eval scores a fixed 15-question set with three independent LLM judges (context relevance, groundedness, answer relevance) and writes per-question scores plus each judge's reasoning to `evaluation/judgment.csv`:
+The eval scores a fixed 20-question set with three independent LLM judges (context relevance, groundedness, answer relevance) and writes per-question scores plus each judge's reasoning to `evaluation/judgment.csv`:
 
 ```bash
-uv run --extra eval python -m evaluation.eval_runner
+uv run --extra eval python -m evaluation.eval_runner            # generate answers, then judge
+uv run --extra eval python -m evaluation.eval_runner --rejudge  # re-judge saved answers
 ```
+
+Generation and judging are separate phases. The first command saves every answer and its retrieved documents to `evaluation/last_run.jsonl`; `--rejudge` scores those saved answers without regenerating. That matters because generation is not temperature-pinned, so changing a judge or a rubric and re-running would confound the change with run-to-run variance. It is also much cheaper, since no pipeline calls are paid twice.
 
 **Every run bills.** Each question costs a full agentic pipeline run (model calls, embeddings, Pinecone queries) plus three judge calls, so this is not a command to fire off casually. It needs `ANTHROPIC_API_KEY`: the judges call the Anthropic SDK directly rather than going through the pipeline's provider abstraction. `judgment.csv` is overwritten in place, so copy off any run worth keeping before starting another.
 
 The harness is local and offline, never deployed. It imports `generate_response` in-process instead of calling the HTTP API, so a run never touches API Gateway or Lambda. It also uses whatever `LLM_PROVIDER` resolves to locally, which is the direct Anthropic client rather than the Bedrock path the deployed Lambda takes. That is a deliberate cost decision, and worth stating plainly: **the eval measures the same model tier production runs, over a different transport.**
 
-Judge model and generation model are currently the same (`claude-sonnet-4-6`), so the model grades its own output. That is a known limitation of the setup rather than a property of the scores, and it has not been controlled for: no run to date has varied the judge model while holding the generation model fixed.
+Judge and generation model are both `claude-sonnet-4-6`, so the model grades its own output. That was an uncontrolled limitation until the split above made it testable. Re-judging one set of answers with Haiku 4.5 instead scored **16 of 20 rows identically**, with the means moving CR 2.90→2.85, G 2.90→2.80, AR 2.95→2.75. The movement is downward but the four disagreements have three different causes, including one clear judge error, so the honest reading is that self-evaluation bias is bounded small on this set rather than absent. See [`docs/architecture.md`](docs/architecture.md) for the breakdown.
 
 ---
 

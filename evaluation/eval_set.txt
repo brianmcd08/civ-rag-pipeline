@@ -49,3 +49,18 @@ Land combat units who move next to the Matterhorn ignore Hills for the rest of t
 15) What is the Migration Treaty?
 +20% faster Population growth but -5 Loyalty per turn in this player's cities.
 or +5 Loyalty per turn but -20% Population growth in this player's cities.
+
+16) What is the Warrior's production cost in version 7.5?
+20
+
+17) What is the Scout's production cost in version 7.5?
+15
+
+18) What is the Eagle Warrior's production cost in version 7.5?
+32
+
+19) What is the Knight's melee strength in version 7.5?
+50
+
+20) What does the Eagle Warrior upgrade to?
+The documents do not say. BBG unit entries carry stats, what a unit replaces, and its abilities, but no forward upgrade-path data, so this cannot be answered from the corpus. Naming a specific successor unit is not supported by the retrieved documents even when that unit exists elsewhere in the corpus.
