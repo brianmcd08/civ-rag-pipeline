@@ -1,7 +1,10 @@
 resource "aws_ecr_repository" "app" {
   name = var.project_name
 
-  # Redeploys overwrite the same :latest tag, so tags must be mutable.
+  # deploy.sh tags with the short commit SHA, so redeploying an unchanged
+  # commit (a rebuild after a base-image or dependency bump, a re-apply after a
+  # failed deploy) pushes that same tag again. An immutable repository rejects
+  # that push. Only the -dirty-<timestamp> variants are guaranteed unique.
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {

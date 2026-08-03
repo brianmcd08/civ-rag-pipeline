@@ -213,7 +213,7 @@ uv run --extra eval python -m evaluation.eval_runner
 
 The harness is local and offline, never deployed. It imports `generate_response` in-process instead of calling the HTTP API, so a run never touches API Gateway or Lambda. It also uses whatever `LLM_PROVIDER` resolves to locally, which is the direct Anthropic client rather than the Bedrock path the deployed Lambda takes. That is a deliberate cost decision, and worth stating plainly: **the eval measures the same model tier production runs, over a different transport.**
 
-Judge model and generation model are currently the same (`claude-sonnet-4-6`), which is a known limitation of the setup rather than a property of the scores. The preserved `evaluation/judgment_haiku_agentic_baseline.csv` is a cross-model reference point.
+Judge model and generation model are currently the same (`claude-sonnet-4-6`), so the model grades its own output. That is a known limitation of the setup rather than a property of the scores, and it has not been controlled for: no run to date has varied the judge model while holding the generation model fixed.
 
 ---
 
