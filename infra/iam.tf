@@ -7,7 +7,7 @@ locals {
   # The global profile forwards to the underlying foundation model in whichever
   # region has capacity, so the model ARN must be allowed in any region too.
   # Verified with: aws bedrock get-inference-profile --inference-profile-identifier global.anthropic.claude-sonnet-4-6
-  bedrock_model_arn = "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6"
+  bedrock_model_arn = "arn:aws:bedrock:*::foundation-model/${trimprefix(var.bedrock_model_id, "global.")}"
 }
 
 # Trust policy: only the Lambda service may assume this role.
