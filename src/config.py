@@ -18,7 +18,7 @@ if LLM_PROVIDER != "bedrock":
 # LLM
 # ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_MODEL = "claude-sonnet-4-6"
-ANTHROPIC_JUDGE = "claude-sonnet-4-6"
+ANTHROPIC_JUDGE = "claude-haiku-4-5"
 LLM_TIMEOUT = 30
 
 # Ingestion
