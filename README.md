@@ -79,7 +79,8 @@ src/
 ├── utils.py              # format_docs helper
 ├── secrets.py            # Reads from st.secrets (cloud) or .env (local)
 ├── response_generator.py # Pipeline entry point: query parsing + agent invocation
-└── api.py                # FastAPI service (POST /query, GET /health) + Mangum handler for Lambda
+├── api.py                # FastAPI service (POST /query, GET /health) + Mangum handler for Lambda
+└── mcp_server.py         # MCP server wrapping the six retrieval tools for local MCP clients
 evaluation/              # RAG triad eval pipeline
 ├── eval_runner.py              # Runs RAG triad eval across question set
 ├── schema.py                   # PartialJudgment and Judgment types
@@ -120,6 +121,21 @@ uv run --extra api uvicorn src.api:app --port 8000
 - `POST /query` (requires `X-API-Key`) with `{"query": "...", "thread_id": "...", "history": []}` returns `{"response": "...", "documents": [...]}`. `thread_id` selects the conversation thread for memory; interactive docs are at `/docs`.
 
 The agent and its Postgres-backed checkpointer are built once per process by a lazy singleton (`get_agent()`) over a `psycopg` connection pool, so concurrent requests each borrow their own connection. **Every surface uses that one construction path** — local uvicorn, Docker Compose, and Lambda alike. On Lambda this means the agent and pool are reused for the container's lifetime rather than rebuilt per request, which is why `handler = Mangum(app, lifespan="off")`: Mangum runs an ASGI lifespan per *invocation*, not per container, so leaving it on would tear down the singleton after every request. The pool runs `min_size=0` so an idle warm container parks no database connection; details in [`docs/architecture.md`](docs/architecture.md#serverless-outside-a-vpc).
+
+---
+
+## MCP server
+
+The same six retrieval tools are also exposed as an MCP server (`src/mcp_server.py`) for local MCP clients such as Claude Code, so they can be called directly without going through the agent or the HTTP API:
+
+```bash
+uv run --extra mcp python -m src.mcp_server
+```
+
+- Registers each tool straight from `src.agent.tools.tool_list` by function, name, and description — no separate schema to maintain, so it cannot drift from `tools.py`.
+- Stdio transport only: an MCP client launches the process on demand and tears it down when done. No persistent server, no port, nothing deployed.
+- The `mcp` extra depends on `pipeline` alone, not `serve-core` — retrieval needs neither the LangGraph agent nor the Postgres checkpointer.
+- Register with Claude Code: `claude mcp add civ-rag -- uv run --directory <path-to-this-repo> --extra mcp python -m src.mcp_server`. Secrets load the same way as every other local surface, via `.env` in the repo root, so nothing needs passing on the command line.
 
 ---
 

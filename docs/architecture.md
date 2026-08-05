@@ -45,6 +45,8 @@ Streamlit Cloud  →  API Gateway  →  Lambda  →  Neon + Bedrock
 
 The Streamlit app is a thin HTTP client. It holds `APP_PASSWORD`, `API_SHARED_SECRET` and `API_BASE_URL`, and has no model or database credentials and no `psycopg` in its image. The FastAPI service behind it exposes `GET /health` (open, dependency-free), `POST /warm` and `POST /query` (both key-gated). Local development mirrors the same topology through Docker Compose: `db` → `api` → `app`. Inference runs on Bedrock **only on the Lambda path**, via the global inference profile `global.anthropic.claude-sonnet-4-6`; Streamlit Cloud and local development use the direct Anthropic client, gated by `LLM_PROVIDER`. It is the same Sonnet 4.6 tier either way — only the transport differs, so this is not a migration to Bedrock.
 
+**A second, local-only surface: MCP.** `src/mcp_server.py` wraps the same six retrieval tools as an MCP server for MCP clients (Claude Code, etc.), registering each directly from `src.agent.tools.tool_list` by function, name, and description rather than hand-writing wrapper functions — the schema an MCP client sees stays in sync with `tools.py` automatically, nothing to duplicate or drift. Stdio transport only: an MCP client launches the server as a subprocess per connection and tears it down when done, so there is no persistent process and nothing deployed. The `mcp` extra depends on `pipeline` alone — confirmed by inspecting `tools.py`'s full import chain — since retrieval needs neither the LangGraph agent nor the Postgres checkpointer that `serve-core` brings in.
+
 **Constants** (`src/config.py`): `ALPHA = 0.5`, `K_SECTION = 5`, `K_GENERAL = 8`, `RECURSION_LIMIT = 25`, `K_INGEST = 25`. Three of those are 25 and they mean different things.
 
 ---
