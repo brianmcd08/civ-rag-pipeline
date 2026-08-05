@@ -4,6 +4,7 @@ from src.constants import (  # noqa: F401  (re-exported for existing import site
     API_KEY_HEADER_NAME,
     CHUNK_CONTENT_LIMIT,
     HISTORY_LIMIT,
+    MCP_SERVER_NAME,
     RECURSION_LIMIT,
     Section,
     Version,
@@ -38,11 +39,6 @@ INDEX_DIMENSION = 1536
 INDEX_CLOUD = "aws"
 INDEX_METRIC = "dotproduct"
 INDEX_REGION = "us-east-1"
-
-# App constants (API_KEY_HEADER_NAME, HISTORY_LIMIT, RECURSION_LIMIT,
-# CHUNK_CONTENT_LIMIT) and the Version/Section enums now live in
-# src/constants.py and are re-exported by the import at the top of this file.
-
 
 if LLM_PROVIDER == "bedrock":
     from langchain_aws import ChatBedrockConverse

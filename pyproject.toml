@@ -4,9 +4,6 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-# Deliberately EMPTY. Everything moved into the `pipeline` extra below so the
-# Streamlit frontend can be a genuinely thin client: a bare install pulls in
-# nothing, and each surface asks for exactly the extra it needs. A bare
 # `uv sync` now produces an empty environment, so every install command must
 # name an extra (all of them already do: Dockerfile `--extra serve`,
 # Dockerfile.lambda `--extra api`, requirements.txt `.[serve]`, README's
@@ -14,9 +11,6 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-# The retrieval/LLM core: config, retriever, secrets, logging_config. Was the
-# unconditional [project] dependencies block until the 2026-08-01 consolidation.
-# Depended on by serve-core, ingest, and (transitively) api and eval.
 pipeline = [
     "langchain>=1.3.4",
     "langchain-anthropic>=1.4.1",
@@ -26,10 +20,6 @@ pipeline = [
     "python-dotenv>=1.2.2",
     "structlog>=26.1.0",
 ]
-# Shared serving stack: the agent runtime + Postgres-backed checkpointer with a
-# connection pool. Imported by construct_agents.py. The `api` extra depends on
-# it; `serve` does too for now, but Step 5 of the consolidation drops that once
-# app.py stops importing src.response_generator.
 serve-core = [
     "civilization-chatbot[pipeline]",
     "langgraph>=1.2.3",
@@ -37,18 +27,7 @@ serve-core = [
     "psycopg[binary]>=3.3.4",
     "psycopg-pool>=3.3.1",
 ]
-# Streamlit client, now genuinely thin. serve-core was dropped 2026-08-01 once
-# app.py stopped importing src.response_generator and became an HTTP client of
-# the api surface. No langchain, langgraph, psycopg, pinecone or openai in the
-# frontend image, and no model or database credentials with them. httpx is the
-# API transport (Timeout(connect=, read=) split, reusable Client with base_url).
-serve = [
-    "streamlit>=1.56.0",
-    "httpx>=0.28.1",
-    "python-dotenv>=1.2.2",
-]
-# FastAPI client (the deployed API; step 3 wraps this in a container-image
-# Lambda and adds Mangum). Deliberately excludes Streamlit.
+serve = ["streamlit>=1.56.0", "httpx>=0.28.1", "python-dotenv>=1.2.2"]
 api = [
     "civilization-chatbot[serve-core]",
     "fastapi>=0.139.2",
@@ -56,52 +35,35 @@ api = [
     "mangum>=0.21.0",
     "uvicorn[standard]>=0.51.0",
 ]
-# Scrape + embed + upsert to Pinecone. Runs locally on demand, never deployed.
-# Needs an explicit `pipeline` reference now that the base block is empty: the
-# ingester imports config/retriever/logging_config, which it used to get for free.
 ingest = [
     "civilization-chatbot[pipeline]",
     "beautifulsoup4>=4.14.3",
     "langchain-community>=0.4.2",
     "requests>=2.33.1",
 ]
-# Offline eval harness. Imports generate_response in-process (hence serve-core)
-# and the raw anthropic SDK directly for the judges. Runs locally, never deployed.
-eval = [
-    "civilization-chatbot[serve-core]",
-    "anthropic>=0.96.0",
-]
+eval = ["civilization-chatbot[serve-core]", "anthropic>=0.96.0"]
+mcp = ["civilization-chatbot[pipeline]", "mcp>=2.0.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 
-# Pylance/pyright resolve imports from here regardless of which interpreter is
-# selected in the VS Code UI, which is what makes this durable:
-# python.defaultInterpreterPath is only a default and is ignored once a
-# workspace interpreter has been explicitly picked.
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
 
 [dependency-groups]
-dev = [
-    "pytest>=9.0.3",
-    "ruff>=0.15.16",
-]
+dev = ["pytest>=9.0.3", "ruff>=0.15.16"]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-# E/W pycodestyle, F pyflakes, I isort (drives organize-imports on save),
-# UP pyupgrade, B bugbear, SIM simplify, C4 comprehensions.
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4"]
 ignore = [
-    "E501",  # line length is enforced by the formatter, not the linter
+    "E501", # line length is enforced by the formatter, not the linter
 ]
 
 [tool.ruff.format]
 docstring-code-format = true
-
