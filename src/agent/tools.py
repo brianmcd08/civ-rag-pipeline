@@ -1,4 +1,5 @@
 from langchain_core.tools import tool
+
 from src.config import K_GENERAL, K_SECTION, Version
 from src.retrieval.retriever import hybrid_query
 from src.utils import format_docs

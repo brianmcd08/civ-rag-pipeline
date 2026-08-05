@@ -74,11 +74,11 @@ FOOTNOTE = (
 
 # --- layout (in pixels; figure is 2064 x 778 at dpi=100) -------------------
 W, H = 2064, 778
-LEFT = 225          # x where the first column of cells starts
+LEFT = 225  # x where the first column of cells starts
 COL_W, COL_GAP = 332, 15
-ROW_TOP = 124       # y (from top) where the first row of cells starts
+ROW_TOP = 124  # y (from top) where the first row of cells starts
 ROW_H, ROW_GAP = 105, 19
-HEADER_Y = 83       # y (from top) of the column header baseline
+HEADER_Y = 83  # y (from top) of the column header baseline
 
 fig = plt.figure(figsize=(W / 100, H / 100), dpi=100)
 ax = fig.add_axes([0, 0, 1, 1])
@@ -93,29 +93,56 @@ def draw_cell(x, y, w, h, title, sub, changed):
     t_col, s_col = (BLUE_TITLE, BLUE_SUB) if changed else (GRAY_TITLE, GRAY_SUB)
     ax.add_patch(
         FancyBboxPatch(
-            (x, y), w, h,
+            (x, y),
+            w,
+            h,
             boxstyle="round,pad=0,rounding_size=10",
-            facecolor=fill, edgecolor=edge, linewidth=2,
+            facecolor=fill,
+            edgecolor=edge,
+            linewidth=2,
         )
     )
-    ax.text(x + w / 2, y + h * 0.38, title, ha="center", va="center",
-            fontsize=17, fontweight="bold", color=t_col)
-    ax.text(x + w / 2, y + h * 0.72, sub, ha="center", va="center",
-            fontsize=13.5, color=s_col)
+    ax.text(
+        x + w / 2,
+        y + h * 0.38,
+        title,
+        ha="center",
+        va="center",
+        fontsize=17,
+        fontweight="bold",
+        color=t_col,
+    )
+    ax.text(x + w / 2, y + h * 0.72, sub, ha="center", va="center", fontsize=13.5, color=s_col)
 
 
 # column headers
 for c, name in enumerate(COLUMNS):
-    ax.text(LEFT + c * (COL_W + COL_GAP) + COL_W / 2, HEADER_Y, name,
-            ha="center", va="center", fontsize=17, color=HEADER_COLOR)
+    ax.text(
+        LEFT + c * (COL_W + COL_GAP) + COL_W / 2,
+        HEADER_Y,
+        name,
+        ha="center",
+        va="center",
+        fontsize=17,
+        color=HEADER_COLOR,
+    )
 
 # row labels + cells
 for r, ((phase, date), row_cells) in enumerate(zip(ROWS, CELLS)):
     y = ROW_TOP + r * (ROW_H + ROW_GAP)
-    ax.text(LEFT - 18, y + ROW_H * 0.40, phase, ha="right", va="center",
-            fontsize=21, fontweight="bold", color="#111111")
-    ax.text(LEFT - 18, y + ROW_H * 0.72, date, ha="right", va="center",
-            fontsize=13.5, color=GRAY_SUB)
+    ax.text(
+        LEFT - 18,
+        y + ROW_H * 0.40,
+        phase,
+        ha="right",
+        va="center",
+        fontsize=21,
+        fontweight="bold",
+        color="#111111",
+    )
+    ax.text(
+        LEFT - 18, y + ROW_H * 0.72, date, ha="right", va="center", fontsize=13.5, color=GRAY_SUB
+    )
     for c, (title, sub, changed) in enumerate(row_cells):
         draw_cell(LEFT + c * (COL_W + COL_GAP), y, COL_W, ROW_H, title, sub, changed)
 
@@ -126,15 +153,22 @@ for x, fill, edge, label in [
     (LEFT + 190, BLUE_FILL, BLUE_EDGE, "Changed"),
 ]:
     ax.add_patch(
-        FancyBboxPatch((x, ly), 34, 24, boxstyle="round,pad=0,rounding_size=5",
-                       facecolor=fill, edgecolor=edge, linewidth=2)
+        FancyBboxPatch(
+            (x, ly),
+            34,
+            24,
+            boxstyle="round,pad=0,rounding_size=5",
+            facecolor=fill,
+            edgecolor=edge,
+            linewidth=2,
+        )
     )
-    ax.text(x + 44, ly + 12, label, ha="left", va="center", fontsize=15,
-            color="#222222")
+    ax.text(x + 44, ly + 12, label, ha="left", va="center", fontsize=15, color="#222222")
 
 # footnote
-ax.text(LEFT, ly + 52, FOOTNOTE, ha="left", va="center", fontsize=13.5,
-        color=FOOT_COLOR, style="italic")
+ax.text(
+    LEFT, ly + 52, FOOTNOTE, ha="left", va="center", fontsize=13.5, color=FOOT_COLOR, style="italic"
+)
 
 fig.savefig("docs/civ_rag_evolution.png", dpi=100)
 print("wrote docs/civ_rag_evolution.png")

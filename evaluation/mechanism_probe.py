@@ -39,9 +39,7 @@ def invoke(agent, query, history, thread_id):
         "configurable": {"thread_id": thread_id},
         "recursion_limit": RECURSION_LIMIT,
     }
-    result = agent.invoke(
-        {"messages": [{"role": "user", "content": message}]}, config=config
-    )
+    result = agent.invoke({"messages": [{"role": "user", "content": message}]}, config=config)
     return parsed, result["messages"]
 
 
@@ -70,7 +68,9 @@ def main():
         {"role": "assistant", "content": msgs1[-1].text},
     ]
     parsed2, msgs2 = invoke(agent, CHALLENGE, history, tid)
-    print(f"TURN 2 query='{CHALLENGE}'  cleaned='{parsed2.cleaned_query}' version={parsed2.version}")
+    print(
+        f"TURN 2 query='{CHALLENGE}'  cleaned='{parsed2.cleaned_query}' version={parsed2.version}"
+    )
     calls2 = count_tool_calls(msgs2)
     print(f"  cumulative tool calls in state: {calls2}")
     n_tools_after_2 = sum(isinstance(m, ToolMessage) for m in msgs2)
@@ -92,7 +92,7 @@ def main():
         elif isinstance(m, HumanMessage):
             print(f"  [{kind}] {str(m.content)[:100]}")
         else:
-            print(f"  [{kind}] {str(getattr(m,'content',''))[:100]}")
+            print(f"  [{kind}] {str(getattr(m, 'content', ''))[:100]}")
 
 
 if __name__ == "__main__":

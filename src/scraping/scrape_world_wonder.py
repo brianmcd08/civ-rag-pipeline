@@ -32,9 +32,7 @@ def parse_page(soup: BeautifulSoup, version: str) -> list[UnifiedEntry]:
     for div in container.find_all("div", recursive=False):
         chart = div.find("div", class_="chart")
         if chart:
-            comment = chart.find(
-                string=lambda s: isinstance(s, Comment) and "LOC_ERA" in s
-            )
+            comment = chart.find(string=lambda s: isinstance(s, Comment) and "LOC_ERA" in s)
             if comment:
                 current_era = chart.find("h2", class_="civ-name").get_text(strip=True)  # type: ignore
                 continue

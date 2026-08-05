@@ -56,9 +56,7 @@ def parse_page(soup: BeautifulSoup, version: str) -> list[UnifiedEntry]:
             # charges text looks like "1 " after stripping the img — keep just the digit
             charges = charges_raw.split()[0] if charges_raw else ""
 
-            description = " ".join(
-                p.get_text(separator=" ", strip=True) for p in ability_descs
-            )
+            description = " ".join(p.get_text(separator=" ", strip=True) for p in ability_descs)
 
             entries.append(
                 UnifiedEntry(

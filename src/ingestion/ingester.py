@@ -6,8 +6,8 @@ from langchain_community.retrievers import PineconeHybridSearchRetriever
 from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone, ServerlessSpec
 from pinecone_text.sparse import BM25Encoder
-from src.logging_config import logger
 
+import src.scraping.scrape_orchestrator as scrape_orchestrator
 from src.config import (
     ALPHA,
     BM25_MODEL_PATH,
@@ -18,7 +18,7 @@ from src.config import (
     INDEX_REGION,
     K_INGEST,
 )
-import src.scraping.scrape_orchestrator as scrape_orchestrator
+from src.logging_config import logger
 from src.schema import UnifiedEntry
 
 load_dotenv()
@@ -47,9 +47,7 @@ def main():
     entries: list[UnifiedEntry] = scrape_orchestrator.run_all()
     logger.info("Total scraped entries", total_entries=len(entries))
     deduplicated_entries = deduplicate(entries)
-    logger.info(
-        "Total entries after deduplication", total_entries=len(deduplicated_entries)
-    )
+    logger.info("Total entries after deduplication", total_entries=len(deduplicated_entries))
     bm25_encoder = BM25Encoder(language="english", remove_stopwords=True, stem=True)
     bm25_encoder.fit(get_texts(deduplicated_entries))
     os.makedirs("models", exist_ok=True)
@@ -89,8 +87,7 @@ def main():
     for batch_num, batch in enumerate(get_batches(deduplicated_entries, 200)):
         texts = get_texts(batch)
         metadatas = [
-            {**entry.generate_metadata(), "bbg_version": versions}
-            for entry, versions in batch
+            {**entry.generate_metadata(), "bbg_version": versions} for entry, versions in batch
         ]
         ids = [entry.generate_hash() for entry, _ in batch]
 
@@ -101,9 +98,7 @@ def main():
                 batch_num=batch_num,
                 batch_size=len(batch),
                 sections={m["section"] for m in metadatas},
-                bbg_versions={
-                    bbg_version for m in metadatas for bbg_version in m["bbg_version"]
-                },
+                bbg_versions={bbg_version for m in metadatas for bbg_version in m["bbg_version"]},
                 status="success",
             )
         except Exception as error:
@@ -112,9 +107,7 @@ def main():
                 batch_num=batch_num,
                 batch_size=len(batch),
                 sections={m["section"] for m in metadatas},
-                bbg_versions={
-                    bbg_version for m in metadatas for bbg_version in m["bbg_version"]
-                },
+                bbg_versions={bbg_version for m in metadatas for bbg_version in m["bbg_version"]},
                 status="error",
                 error_type=type(error).__name__,
                 error_msg=str(error),

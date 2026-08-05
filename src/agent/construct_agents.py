@@ -138,9 +138,7 @@ def build_checkpointer():
 
 def build_agent(checkpointer):
     """Construct the retrieval agent bound to the given checkpointer."""
-    return create_agent(
-        model=llm, tools=tool_list, system_prompt=prompt, checkpointer=checkpointer
-    )
+    return create_agent(model=llm, tools=tool_list, system_prompt=prompt, checkpointer=checkpointer)
 
 
 _agent = None

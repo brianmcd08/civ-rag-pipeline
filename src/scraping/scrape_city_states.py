@@ -22,9 +22,7 @@ def parse_page(soup: BeautifulSoup, version: str) -> list[UnifiedEntry]:
     )
 
     for item in items:
-        item_name = item.find("h2", class_="civ-name").get_text(
-            separator=" ", strip=True
-        )
+        item_name = item.find("h2", class_="civ-name").get_text(separator=" ", strip=True)
 
         item_descr = item.find("p", class_="civ-ability-desc actual-text").get_text(
             separator=" ", strip=True

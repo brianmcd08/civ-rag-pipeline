@@ -1,5 +1,6 @@
-from src.retrieval.retriever import hybrid_query
 from dotenv import load_dotenv
+
+from src.retrieval.retriever import hybrid_query
 
 load_dotenv()
 

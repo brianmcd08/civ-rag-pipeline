@@ -1,13 +1,12 @@
-from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.errors import GraphRecursionError
 
-from src.retrieval import version_extractor as ve
 from src.config import HISTORY_LIMIT, RECURSION_LIMIT
+from src.retrieval import version_extractor as ve
 
 NO_ANSWER_MESSAGE = (
-    "I wasn't able to find a confident answer to that — try rephrasing or "
-    "narrowing your question."
+    "I wasn't able to find a confident answer to that — try rephrasing or narrowing your question."
 )
 
 
@@ -38,15 +37,11 @@ def generate_response(
         "recursion_limit": RECURSION_LIMIT,
     }
     try:
-        result = agent.invoke(
-            {"messages": [{"role": "user", "content": message}]}, config=config
-        )
+        result = agent.invoke({"messages": [{"role": "user", "content": message}]}, config=config)
     except GraphRecursionError:
         return NO_ANSWER_MESSAGE, []
 
     response = result["messages"][-1].text
-    documents: list[str] = [
-        m.text for m in result["messages"] if isinstance(m, ToolMessage)
-    ]
+    documents: list[str] = [m.text for m in result["messages"] if isinstance(m, ToolMessage)]
 
     return response, documents

@@ -62,9 +62,7 @@ class ApiClient:
         except Exception:
             return False
 
-    def query(
-        self, query: str, history: list[dict], thread_id: str
-    ) -> tuple[str, list[str]]:
+    def query(self, query: str, history: list[dict], thread_id: str) -> tuple[str, list[str]]:
         """Ask a question. Returns (answer, documents).
 
         No automatic retry. A retry on the cold path buys a second full Bedrock
@@ -84,8 +82,7 @@ class ApiClient:
             ) from e
         except httpx.ReadTimeout as e:
             raise ApiError(
-                f"The API did not respond within {READ_TIMEOUT:.0f}s. "
-                "Please try again."
+                f"The API did not respond within {READ_TIMEOUT:.0f}s. Please try again."
             ) from e
         except httpx.HTTPError as e:
             raise ApiError(f"Could not reach the API: {e}") from e

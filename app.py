@@ -112,9 +112,7 @@ if prompt := st.chat_input("Ask about units, leaders, balance changes, or wonder
     with st.chat_message("assistant"):
         try:
             with st.spinner("Thinking..."):
-                answer, _ = client.query(
-                    prompt, prior_messages, st.session_state["thread_id"]
-                )
+                answer, _ = client.query(prompt, prior_messages, st.session_state["thread_id"])
         except ApiError as e:
             # Drop the dangling user turn so a retry does not send it twice.
             st.session_state.messages.pop()

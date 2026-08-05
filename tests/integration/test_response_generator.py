@@ -11,9 +11,7 @@ def test_generate_response(stateless_agent):
     # thread_id must be a real value, not "": an empty string is falsy inside
     # LangGraph's config resolution. The injected agent carries no checkpointer,
     # so nothing is persisted either way, but the id still has to be well-formed.
-    response, documents = generate_response(
-        query, [], str(uuid4()), agent=stateless_agent
-    )
+    response, documents = generate_response(query, [], str(uuid4()), agent=stateless_agent)
 
     assert response
     assert expected_answer.value in response

@@ -39,9 +39,7 @@ class UnifiedEntry:
     section: Section  # page name
     version: str  # bbg version
 
-    name: str | None = (
-        None  # e.g. "Accona Desert" or individual person name, e.g. "Boudica"
-    )
+    name: str | None = None  # e.g. "Accona Desert" or individual person name, e.g. "Boudica"
     category: str | None = (
         None  # e.g. "Desert", "Mountain", "River" or top-level h1 section e.g. "Game Mechanics", "Leaders"
     )

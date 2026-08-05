@@ -27,9 +27,7 @@ context_relevance_prompt = """
     """
 
 
-async def context_relevance_judge(
-    chunks: list[str], query: str
-) -> PartialJudgment:
+async def context_relevance_judge(chunks: list[str], query: str) -> PartialJudgment:
     result = (
         await client.beta.messages.parse(
             model=ANTHROPIC_JUDGE,

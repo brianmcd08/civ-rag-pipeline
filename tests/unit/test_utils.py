@@ -1,5 +1,5 @@
-from langchain_core.documents import Document
 import pytest
+from langchain_core.documents import Document
 
 from src.config import CHUNK_CONTENT_LIMIT
 from src.utils import format_docs

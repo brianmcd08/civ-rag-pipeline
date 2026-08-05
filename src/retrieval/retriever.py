@@ -19,14 +19,10 @@ bm25_encoder = BM25Encoder()
 bm25_encoder.load(BM25_MODEL_PATH)
 
 
-def hybrid_query(
-    query: str, k: int, filter: dict[str, Any] | None = None
-) -> list[Document]:
+def hybrid_query(query: str, k: int, filter: dict[str, Any] | None = None) -> list[Document]:
     dense = embeddings.embed_query(query)
     sparse_result = bm25_encoder.encode_queries(query)
-    sparse: SparseVector = (
-        sparse_result if isinstance(sparse_result, dict) else sparse_result[0]
-    )
+    sparse: SparseVector = sparse_result if isinstance(sparse_result, dict) else sparse_result[0]
     scaled_dense = [v * ALPHA for v in dense]
     scaled_sparse = SparseValues(
         indices=cast(list[int], sparse["indices"]),
@@ -47,9 +43,7 @@ def hybrid_query(
     return [
         Document(
             page_content=match.metadata.get("context", ""),
-            metadata={
-                key: val for key, val in match.metadata.items() if key != "context"
-            },
+            metadata={key: val for key, val in match.metadata.items() if key != "context"},
         )
         for match in result.matches
     ]
