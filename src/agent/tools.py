@@ -91,3 +91,13 @@ def search_general(query: str, version: Version | None = None) -> str:
         query, k=K_GENERAL, filter=_build_filter(section_filter=None, version=version)
     )
     return format_docs(docs)
+
+
+tool_list = [
+    search_units,
+    search_leaders,
+    search_great_people,
+    search_techs_and_civics,
+    search_buildings_and_improvements,
+    search_general,
+]

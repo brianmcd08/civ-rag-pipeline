@@ -6,25 +6,9 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-from src.agent.tools import (
-    search_buildings_and_improvements,
-    search_general,
-    search_great_people,
-    search_leaders,
-    search_techs_and_civics,
-    search_units,
-)
+from src.agent.tools import tool_list
 from src.config import llm
 from src.logging_config import logger
-
-tool_list = [
-    search_buildings_and_improvements,
-    search_general,
-    search_leaders,
-    search_techs_and_civics,
-    search_units,
-    search_great_people,
-]
 
 prompt = """
 Always use the available search tools to find the answer to the query
