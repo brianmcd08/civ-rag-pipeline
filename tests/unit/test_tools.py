@@ -1,6 +1,7 @@
 import pytest
 
 from src.agent.tools import _build_filter
+from src.constants import Version
 
 
 @pytest.fixture
@@ -31,3 +32,9 @@ def test_build_filter_both(_section_and_filter):
 
 def test_build_filter_neither():
     assert _build_filter(None, None) is None
+
+
+def test_build_filter_accepts_version_enum_member(_section_and_filter):
+    section_filter, version_str = _section_and_filter
+    response = _build_filter(section_filter=section_filter, version=Version.V73)
+    assert response == {"$and": [section_filter, {"bbg_version": {"$eq": version_str}}]}
