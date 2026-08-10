@@ -43,6 +43,12 @@ INDEX_DIMENSION = 1536
 INDEX_CLOUD = "aws"
 INDEX_METRIC = "dotproduct"
 INDEX_REGION = "us-east-1"
+# Same shape as the embeddings pair: worst case is (retries + 1) * timeout plus
+# backoff. The SDK default is JitterRetry(total=5), so 6 attempts and ~7.75s of
+# backoff; bounding one attempt does not bound the call. Floor is measured
+# healthy latency (median 0.09s, max 0.30s, n=10). Reasoning in docs/architecture.md.
+PINECONE_REQUEST_TIMEOUT = 1
+PINECONE_MAX_RETRIES = 1
 
 if LLM_PROVIDER == "bedrock":
     from langchain_aws import ChatBedrockConverse
