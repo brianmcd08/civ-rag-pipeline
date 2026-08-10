@@ -6,7 +6,13 @@ from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone, QueryResponse, SparseValues
 from pinecone_text.sparse import BM25Encoder, SparseVector
 
-from src.config import ALPHA, BM25_MODEL_PATH, EMBEDDINGS_MODEL
+from src.config import (
+    ALPHA,
+    BM25_MODEL_PATH,
+    EMBEDDINGS_MAX_RETRIES,
+    EMBEDDINGS_MODEL,
+    EMBEDDINGS_REQUEST_TIMEOUT,
+)
 from src.secrets import get_secret
 
 os.environ["OPENAI_API_KEY"] = get_secret("OPENAI_API_KEY")
@@ -14,7 +20,9 @@ os.environ["PINECONE_API_KEY"] = get_secret("PINECONE_API_KEY")
 
 pc = Pinecone(api_key=get_secret("PINECONE_API_KEY"))
 index = pc.Index(get_secret("PINECONE_INDEX_NAME_V2"))
-embeddings = OpenAIEmbeddings(model=EMBEDDINGS_MODEL)
+embeddings = OpenAIEmbeddings(
+    model=EMBEDDINGS_MODEL, max_retries=EMBEDDINGS_MAX_RETRIES, timeout=EMBEDDINGS_REQUEST_TIMEOUT
+)
 bm25_encoder = BM25Encoder()
 bm25_encoder.load(BM25_MODEL_PATH)
 

@@ -33,6 +33,10 @@ K_GENERAL = 8
 # Embeddings
 EMBEDDINGS_MODEL = "text-embedding-3-small"
 BM25_MODEL_PATH = "models/bm25_values.json"
+# One decision, not two: worst case per embed is (max_retries + 1) * timeout,
+# against the 30s shared across everything on /query. Reasoning in docs/architecture.md.
+EMBEDDINGS_REQUEST_TIMEOUT = 3
+EMBEDDINGS_MAX_RETRIES = 1
 
 # Pinecone
 INDEX_DIMENSION = 1536
