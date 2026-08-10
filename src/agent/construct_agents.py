@@ -31,15 +31,10 @@ def build_checkpointer():
     back so a caller that owns the lifecycle (FastAPI's lifespan) can
     ``.close()`` it on shutdown.
 
-    There is deliberately NO in-memory fallback. The old code dropped to a
-    ``MemorySaver`` when ``DATABASE_URL`` was unset or the connection failed,
-    which meant a dead database presented as a healthy app that had silently
-    stopped persisting anything: conversations vanished between requests and
-    the only signal was a log line nobody was reading. Failing to start is the
+    There is deliberately NO in-memory fallback: failing to start is the
     correct behavior for a service whose whole job is durable conversation
     state. Callers that genuinely do not need persistence (tests, the eval
-    runner) pass ``checkpointer=None`` to ``build_agent`` instead of relying on
-    a fallback here.
+    runner) pass ``checkpointer=None`` to ``build_agent``.
     """
     db_uri = os.getenv("DATABASE_URL")
     if not db_uri:
