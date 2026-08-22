@@ -23,23 +23,21 @@ Live demo requires password due to API costs; screenshots at the bottom.
 
 ---
 
-## Architecture evolution
+## How it got here
 
-The pipeline went through four rewrites to get here, each driven by a measured failure rather than a preference: a single-call extractor became a parser plus a router, dense-only retrieval became hybrid, the router was deleted in favor of an agent choosing its own tools, and a reference-based eval became the RAG triad. The diagram tracks five pipeline stages across those changes; gray means a stage carried over unchanged, blue means a deliberate architecture decision.
+![Architecture evolution from V1 to V5](docs/civ_rag_evolution.png)
 
-![Architecture evolution](docs/civ_rag_evolution.png)
+The diagram tracks five pipeline stages across four rewrites; gray means a stage carried over unchanged, blue means a deliberate architecture decision. The reasoning behind each one is in [`docs/architecture.md`](docs/architecture.md): [what the system is today](docs/architecture.md#the-system-today), [the decisions and what each cost](docs/architecture.md#decisions), [what measurement caught that review didn't](docs/architecture.md#what-measurement-caught-that-review-didnt), and [the gaps that are still open](docs/architecture.md#known-gaps).
 
-[`docs/architecture.md`](docs/architecture.md) carries the reasoning rather than the chronology: [what the system is today](docs/architecture.md#the-system-today), [the decisions and what each one cost](docs/architecture.md#decisions), [what measurement caught that review didn't](docs/architecture.md#what-measurement-caught-that-review-didnt), and [the gaps that are still open](docs/architecture.md#known-gaps-stated-plainly).
-
-**Current eval scores** (RAG triad, 15 questions):
+**Current eval scores** (RAG triad, 20 questions):
 
 | Metric | Score |
 |---|---|
-| Context relevance | 3.00 |
-| Groundedness | 2.73–2.93 |
-| Answer relevance | 2.93 |
+| Context relevance | 2.90 |
+| Groundedness | 2.90 |
+| Answer relevance | 2.95 |
 
-Groundedness is a range rather than a point because generation is not temperature-pinned, so the same eval re-run moves within that band at n=15. Reporting a single number for it would be quoting one run. The earlier reference-based scores are not comparable to these and are not reproduced here: they measured responses against ideal answers rather than against retrieved chunks, which is precisely the blind spot the triad was built to close.
+Generation is not temperature-pinned, so the same eval re-run moves all three of these figures and reporting any one of them as exact would be quoting a single run. These are not comparable to the retired 3.00 / 2.73-2.93 / 2.93 at n=15, which used different questions and a different rubric. The earlier reference-based scores are not comparable to these and are not reproduced here: they measured responses against ideal answers rather than against retrieved chunks, which is precisely the blind spot the triad was built to close.
 
 ---
 
@@ -47,7 +45,7 @@ Groundedness is a range rather than a point because generation is not temperatur
 
 The agent model is Claude Sonnet 4.6. The swap was motivated by a class of confidently wrong answers (Civ 5 values substituted for BBG ones), first read as a training prior overriding retrieval. A later trace-level re-investigation corrected that root cause: the canonical case was a **tool-routing bug**, since `search_leaders`'s docstring advertised unique units while unit records live in the `units` section, so the right chunk was never retrieved at all. The fix is one docstring line, and it is model-independent, holding on Haiku 4.5 as well.
 
-What the measurement does support is grounding: probes built on facts where this corpus diverges from vanilla Civ 6 ground 12 of 12 through the pipeline against 0 of 12 from the raw model. On the RAG triad the two builds are a wash (Sonnet agentic re-runs score G 2.73–2.93 against the deterministic baseline's 2.80 at n=15), so the model decision rests on cost versus flexibility rather than groundedness; Sonnet is 3x Haiku per token. The full investigation, including the revert that was considered and superseded by measurement, is in [`docs/architecture.md`](docs/architecture.md#the-regression-i-announced-a-revert-for-was-a-one-line-bug); the probe scripts are in `evaluation/`.
+What the measurement does support is grounding: probes built on facts where this corpus diverges from vanilla Civ 6 ground 12 of 12 through the pipeline against 0 of 12 from the raw model, which is four divergent facts sampled three times each rather than twelve distinct questions. On the RAG triad the two builds were a wash when measured (Sonnet agentic re-runs scored G 2.73-2.93 against the deterministic baseline's 2.80, both on the retired n=15 set), so the model decision rests on cost versus flexibility rather than groundedness; Sonnet is 3x Haiku per token. The full investigation, including the revert that was considered and superseded by measurement, is in [`docs/architecture.md`](docs/architecture.md#the-regression-i-announced-a-revert-for-was-a-one-line-bug); the probe scripts are in `evaluation/`.
 
 ---
 
@@ -184,7 +182,7 @@ terraform init
 ./deploy.sh                                    # build, push to ECR, terraform apply
 ```
 
-Which provider is used is selected at runtime by `LLM_PROVIDER`, and only the Lambda sets it to `bedrock`; Streamlit Community Cloud and local development continue to use the direct Anthropic client. The function runs **outside a VPC** deliberately, since a VPC-attached Lambda needs a NAT Gateway (roughly $32/month) to reach Neon, Pinecone, OpenAI, and Bedrock. Conversation memory is the same Neon Postgres the Streamlit deployment uses, so a `thread_id` is durable across both surfaces.
+Which provider is used is selected at runtime by `LLM_PROVIDER`, and only the Lambda sets it to `bedrock`. **It is a setting on whichever process runs the pipeline, never on the frontend**: the Streamlit app is a thin HTTP client on every surface and holds no model credentials, so deployed Streamlit reaches Bedrock through the Lambda while local development leaves `LLM_PROVIDER` unset and its `api` container calls the Anthropic API directly. The function runs **outside a VPC** deliberately, since a VPC-attached Lambda needs a NAT Gateway (roughly $32/month) to reach Neon, Pinecone, OpenAI, and Bedrock. Conversation memory is the same Neon Postgres the Streamlit deployment uses, so a `thread_id` is durable across both surfaces.
 
 Cold starts have two regimes, and the variable is whether Lambda has already cached the container image, not how long the function sat idle. The first invocation after a new image is pushed has to fetch and unpack that image inside the init phase, which blows Lambda's hard 10s init cap and re-runs initialization inside the invoke, for a cold `/health` of 23–24s. Once the image is cached, init runs 5.5–6.4s for a cold `/health` of 6.5–7.7s, and that number is flat from five minutes of idle out to 16.3 hours. API Gateway caps its integration timeout at 30 seconds, so only the post-push regime can return a 504 while the function runs to completion and stays warm; the demo protocol is therefore to call `POST /warm` first, then `/query`. (`/health` was the warm-up until construction moved out of the FastAPI lifespan, which made it dependency-free and therefore useless for warming.) Warm latency is about 51ms for `/health` and about 9s for `/query`, with a follow-up on the same thread around 3s. The measurements, the rejected alternatives, and the two failures that appeared only once deployed are in [`docs/architecture.md`](docs/architecture.md#serverless-outside-a-vpc).
 
