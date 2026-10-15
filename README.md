@@ -134,6 +134,7 @@ uv run --extra mcp python -m src.mcp_server
 - Stdio transport only: an MCP client launches the process on demand and tears it down when done. No persistent server, no port, nothing deployed.
 - The `mcp` extra depends on `pipeline` alone, not `serve-core`: retrieval needs neither the LangGraph agent nor the Postgres checkpointer.
 - Register with Claude Code: `claude mcp add civ-rag -- uv run --directory <path-to-this-repo> --extra mcp python -m src.mcp_server`. Secrets load the same way as every other local surface, via `.env` in the repo root, so nothing needs passing on the command line.
+- Running it from a fresh clone needs `OPENAI_API_KEY`, `PINECONE_API_KEY` and `PINECONE_INDEX_NAME_V2` in `.env`. The tools query a Pinecone index in my account, so you'll need to build your own first by running the ingester (see [Re-ingestion](#re-ingestion)). It scrapes the BBG pages, embeds every entry on your OpenAI account, and upserts into your Pinecone index. `src/config.py` also requires `ANTHROPIC_API_KEY` at import, so set it too, even though none of the six tools calls Claude.
 
 ---
 
